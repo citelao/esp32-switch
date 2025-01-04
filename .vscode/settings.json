@@ -11,7 +11,8 @@
         "format": "c",
         "ledc.h": "c",
         "gpio.h": "c",
-        "esp_err.h": "c"
+        "esp_err.h": "c",
+        "led_strip.h": "c"
     },
     "idf.flashType": "UART"
 }
