@@ -5,5 +5,9 @@
         "board/esp32c6-builtin.cfg"
     ],
     "idf.portWin": "COM5",
-    "idf.toolsPathWin": "C:\\Users\\ben\\.espressif"
+    "idf.toolsPathWin": "C:\\Users\\ben\\.espressif",
+    "files.associations": {
+        "esp_log.h": "c"
+    },
+    "idf.flashType": "UART"
 }
