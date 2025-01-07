@@ -11,6 +11,7 @@ static const char *TAG = "CITELAO_ESP32_SWITCH";
 static const uint8_t LED_GPIO_PIN = 8;
 
 // BOOT button, via switch_driver.h
+// Everyone says is GPIO0, but it's GPIO9.
 static const uint8_t SWITCH_GPIO_PIN = GPIO_NUM_9;
 
 static led_strip_handle_t led_strip = NULL;
@@ -22,13 +23,16 @@ void blink(void *arg)
     ESP_LOGI(TAG, "Blinking %s", led_state ? "on" : "off");
 
     led_state = !led_state;
-    ESP_ERROR_CHECK(led_strip_set_pixel(led_strip, 0, led_state ? 255 : 0, isPressed ? 255 : 0, 0));
+    int g = !led_state && isPressed ? 255 : 0;
+    ESP_ERROR_CHECK(led_strip_set_pixel(led_strip, 0, led_state ? 255 : 0, g, 0));
     ESP_ERROR_CHECK(led_strip_refresh(led_strip));
 }
 
 static void IRAM_ATTR switch_pressed(void *arg)
 {
     isPressed = !isPressed;
+
+    // Stack overflows in an ISR handler because of the stack maxes.
     // ESP_LOGI(TAG, "Switch %s", isPressed ? "pressed" : "released");
 }
 
