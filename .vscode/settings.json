@@ -12,7 +12,9 @@
         "ledc.h": "c",
         "gpio.h": "c",
         "esp_err.h": "c",
-        "led_strip.h": "c"
+        "led_strip.h": "c",
+        "esp_zigbee_core.h": "c",
+        "nvs_flash.h": "c"
     },
     "idf.flashType": "UART"
 }

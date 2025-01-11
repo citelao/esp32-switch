@@ -9,6 +9,8 @@ Trying to implement a nice Zigbee switch on an ESP32-C6.
 1. **ESP-IDF: SDK Configuration Editor (Menuconfig)**
 2. Enable Zigbee (at the bottom)
 
+https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/kconfig/configuration_structure.html#sdkconfig-file
+
 ---
 
 # _Sample project_
