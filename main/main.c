@@ -4,6 +4,7 @@
 #include <driver/gpio.h>
 #include <esp_timer.h>
 #include <led_strip.h>
+#include <esp_zigbee_core.h>
 
 static const char *TAG = "CITELAO_ESP32_SWITCH";
 

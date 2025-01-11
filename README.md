@@ -2,6 +2,12 @@
 
 Trying to implement a nice Zigbee switch on an ESP32-C6.
 
+## Troubleshooting
+
+### Zigbee headers not present
+
+1. **ESP-IDF: SDK Configuration Editor (Menuconfig)**
+2. Enable Zigbee (at the bottom)
 
 ---
 
