@@ -34,7 +34,7 @@ static bool isPressed = false;
 void blink(void *arg)
 {
     static bool led_state = false;
-    ESP_LOGI(TAG, "Blinking %s", led_state ? "on" : "off");
+    // ESP_LOGI(TAG, "Blinking %s", led_state ? "on" : "off");
 
     led_state = !led_state;
     int g = !led_state && isPressed ? 255 : 0;
@@ -50,10 +50,58 @@ static void IRAM_ATTR switch_pressed(void *arg)
     // ESP_LOGI(TAG, "Switch %s", isPressed ? "pressed" : "released");
 }
 
-// Name is required by the ESP Zigbee stack.
-void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
+static void bdb_start_top_level_commissioning_cb(uint8_t mode_mask)
 {
-    // TODO
+    ESP_ERROR_CHECK(esp_zb_bdb_start_top_level_commissioning(mode_mask));
+}
+
+// Name is required by the ESP Zigbee stack.
+void esp_zb_app_signal_handler(esp_zb_app_signal_t* signal_struct)
+{
+    uint32_t* p_sg_p = signal_struct->p_app_signal;
+    esp_err_t err_status = signal_struct->esp_err_status;
+    esp_zb_app_signal_type_t sig_type = *p_sg_p;
+    esp_zb_zdo_signal_device_annce_params_t* dev_annce_params = NULL;
+    switch (sig_type) {
+    case ESP_ZB_ZDO_SIGNAL_SKIP_STARTUP:
+        // Called with no_autostart. We must start commissioning.
+        // https://ncsdoc.z6.web.core.windows.net/zboss/3.11.1.177/using_zigbee__z_c_l.html#:~:text=The%20application%20should%20later%20call%20ZBOSS%20commissioning%20initiation%20%E2%80%93%20bdb_start_top_level_commissioning(ZB_BDB_NETWORK_STEERING)%20that%20will%20trigger%20further%20commissioning.
+        // https://github.com/espressif/esp-zigbee-sdk/blob/8114916a4c6d1b4587a9fc24d2c85a1396328a28/examples/esp_zigbee_HA_sample/HA_color_dimmable_switch/main/esp_zb_switch.c#L143C10-L143C40
+        ESP_LOGI(TAG, "Manually starting commissioning");
+        esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_INITIALIZATION);
+        break;
+    case ESP_ZB_BDB_SIGNAL_DEVICE_FIRST_START:
+    case ESP_ZB_BDB_SIGNAL_DEVICE_REBOOT:
+        ESP_LOGI(TAG, "Device started for the first time or rebooted");
+        if (err_status == ESP_OK)
+        {
+            // ESP_LOGI(TAG, "Deferred driver initialization %s", deferred_driver_init() ? "failed" : "successful");
+            const bool is_factory_new = esp_zb_bdb_is_factory_new();
+            ESP_LOGI(TAG, "Device started up in%s factory-reset mode", is_factory_new ? "" : " non");
+            if (is_factory_new)
+            {
+                ESP_LOGI(TAG, "Start network formation");
+                esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_NETWORK_FORMATION);
+            }
+            else
+            {
+                esp_zb_bdb_open_network(180);
+                ESP_LOGI(TAG, "Device rebooted");
+            }
+        }
+        else
+        {
+            ESP_LOGW(TAG, "%s failed with status: %s, retrying", esp_zb_zdo_signal_to_string(sig_type),
+                     esp_err_to_name(err_status));
+            esp_zb_scheduler_alarm((esp_zb_callback_t)bdb_start_top_level_commissioning_cb,
+                                   ESP_ZB_BDB_MODE_INITIALIZATION, 1000);
+        }
+        break;
+    default:
+        ESP_LOGI(TAG, "ZDO signal: %s (0x%x), status: %s", esp_zb_zdo_signal_to_string(sig_type), sig_type,
+                 esp_err_to_name(err_status));
+        break;
+    }
 }
 
 static void zigbee_task(void* params)
