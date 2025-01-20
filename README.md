@@ -2,6 +2,26 @@
 
 Trying to implement a nice Zigbee switch on an ESP32-C6.
 
+## Usage
+
+Prerequisites:
+
+* Hardware: **ESP32C6** or ESP32H2
+* Software: **ESP-IDF** or equivalent. This was generated from `ESP-IDF: New Project` in VS Code. See [the official docs](https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#start-a-new-project).
+* Software: **VS Code** with [**ESP-IDF extension**](https://marketplace.visualstudio.com/items?itemName=espressif.esp-idf-extension). Makes everything *so* easy.
+
+Configure the project:
+
+1. Select the right **target** (`ESP-IDF: Set Expressif Device Target`; probably an `esp32c6` or H2).
+2. Select the right **port** (`ESP-IDF: Select Port To Use`, probably UART & some COM port or dev path)
+
+Inner loop:
+
+1. Make your changes
+2. `ESP-IDF: Build, Flash, and Monitor` (or just substeps of that; `Ctrl-E D`)
+
+Yay!
+
 ## Troubleshooting
 
 ### Zigbee headers not present
@@ -10,38 +30,3 @@ Trying to implement a nice Zigbee switch on an ESP32-C6.
 2. Enable Zigbee (at the bottom)
 
 https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/kconfig/configuration_structure.html#sdkconfig-file
-
----
-
-# _Sample project_
-
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
-
-This is the simplest buildable example. The example is used by command `idf.py create-project`
-that copies the project to user specified path and set it's name. For more information follow the [docs page](https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#start-a-new-project)
-
-
-
-## How to use example
-We encourage the users to use the example as a template for the new projects.
-A recommended way is to follow the instructions on a [docs page](https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#start-a-new-project).
-
-## Example folder contents
-
-The project **sample_project** contains one source file in C language [main.c](main/main.c). The file is located in folder [main](main).
-
-ESP-IDF projects are built using CMake. The project build configuration is contained in `CMakeLists.txt`
-files that provide set of directives and instructions describing the project's source files and targets
-(executable, library, or both). 
-
-Below is short explanation of remaining files in the project folder.
-
-```
-├── CMakeLists.txt
-├── main
-│   ├── CMakeLists.txt
-│   └── main.c
-└── README.md                  This is the file you are currently reading
-```
-Additionally, the sample project contains Makefile and component.mk files, used for the legacy Make based build system. 
-They are not used or needed when building with CMake and idf.py.
