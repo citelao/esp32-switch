@@ -1,4 +1,6 @@
-# "Coordinator" vs "router" vs "end device"
+# Zigbee questions
+
+## "Coordinator" vs "router" vs "end device"
 
 > What's a Zigbee coordinator vs a router vs an end device?
 
@@ -13,6 +15,20 @@ Also, **end devices** "may also sleep", whereas **routers** "may not sleep" (at 
 > [...] **Routers** are also responsible for receiving and storing messages intended for their children.
 
 Seriously, read [their brief page](https://community.silabs.com/s/article/what-is-the-difference-between-an-end-device-a-router-and-a-coordinator-do-i?language=en_US). See also [Digi](https://www.digi.com/resources/documentation/Digidocs/90002002/Concepts/c_device_types.htm?TocPath=Zigbee%20networks%7CZigbee%20networking%20concepts%7C_____1).
+
+## "Client" vs "Server"
+
+**Clients** ask the questions; **servers** have the answer.
+
+For example, if a switch exposes its battery life, it is a server for that info. Anyone asking about it is a client.
+
+https://github.com/SiliconLabs/zigbee_applications/blob/master/zigbee_concepts/Zigbee-Introduction/Zigbee%20Introduction%20-%20Clusters%2C%20Endpoints%2C%20Device%20Types.md
+
+https://medium.com/@omaslyuchenko/hello-zigbee-world-part-15-commands-binding-133567d690b9
+
+---
+
+# SDK questions
 
 # `esp_zb_scheduler_user_alarm` vs `esp_zb_scheduler_alarm`
 

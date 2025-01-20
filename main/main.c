@@ -50,7 +50,7 @@ static void IRAM_ATTR switch_pressed(void *arg)
     // ESP_LOGI(TAG, "Switch %s", isPressed ? "pressed" : "released");
 }
 
-static void bdb_start_top_level_commissioning_cb(uint8_t mode_mask)
+static void start_top_level_commissioning(uint8_t mode_mask)
 {
     ESP_ERROR_CHECK(esp_zb_bdb_start_top_level_commissioning(mode_mask));
 }
@@ -80,20 +80,20 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t* signal_struct)
             ESP_LOGI(TAG, "Device started up in%s factory-reset mode", is_factory_new ? "" : " non");
             if (is_factory_new)
             {
-                ESP_LOGI(TAG, "Start network formation");
+                ESP_LOGI(TAG, "Start network steering");
                 esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_NETWORK_STEERING);
             }
             else
             {
-                esp_zb_bdb_open_network(180);
                 ESP_LOGI(TAG, "Device rebooted");
+                // No need for reconnection, hopefully.
             }
         }
         else
         {
             ESP_LOGW(TAG, "%s failed with status: %s, retrying", esp_zb_zdo_signal_to_string(sig_type),
                      esp_err_to_name(err_status));
-            esp_zb_scheduler_alarm((esp_zb_callback_t)bdb_start_top_level_commissioning_cb,
+            esp_zb_scheduler_alarm((esp_zb_callback_t)start_top_level_commissioning,
                                    ESP_ZB_BDB_MODE_INITIALIZATION, 1000);
         }
         break;
@@ -114,7 +114,7 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t* signal_struct)
     //     else
     //     {
     //         ESP_LOGW(TAG, "Network formation failed with status: %s, retrying", esp_err_to_name(err_status));
-    //         esp_zb_scheduler_alarm((esp_zb_callback_t)bdb_start_top_level_commissioning_cb,
+    //         esp_zb_scheduler_alarm((esp_zb_callback_t)start_top_level_commissioning,
     //                                ESP_ZB_BDB_MODE_NETWORK_FORMATION, 1000);
     //     }
     //     break;
@@ -133,7 +133,7 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t* signal_struct)
         else
         {
             ESP_LOGW(TAG, "Network steering failed with status: %s, retrying", esp_err_to_name(err_status));
-            esp_zb_scheduler_alarm((esp_zb_callback_t)bdb_start_top_level_commissioning_cb,
+            esp_zb_scheduler_alarm((esp_zb_callback_t)start_top_level_commissioning,
                 ESP_ZB_BDB_MODE_NETWORK_STEERING, 1000);
         }
         break;
@@ -175,7 +175,8 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t* signal_struct)
 static void zigbee_task(void* params)
 {
     esp_zb_cfg_t zb_nwk_cfg = {
-        .esp_zb_role = ESP_ZB_DEVICE_TYPE_COORDINATOR,
+        // TODO: make this an End Device so we can sleep.
+        .esp_zb_role = ESP_ZB_DEVICE_TYPE_ROUTER,
         .install_code_policy = false,
         .nwk_cfg = {
             .zczr_cfg = {
@@ -188,7 +189,9 @@ static void zigbee_task(void* params)
     esp_zb_color_dimmable_switch_cfg_t switch_cfg = {
         .basic_cfg = {
             .zcl_version = ESP_ZB_ZCL_BASIC_ZCL_VERSION_DEFAULT_VALUE,
-            .power_source = ZB_ZCL_BASIC_POWER_SOURCE_BATTERY,
+            // TODO: correctly report battery.
+            // .power_source = ZB_ZCL_BASIC_POWER_SOURCE_BATTERY,
+            .power_source = ESP_ZB_ZCL_BASIC_POWER_SOURCE_DEFAULT_VALUE,
         },
         .identify_cfg = {
             .identify_time = ESP_ZB_ZCL_IDENTIFY_IDENTIFY_TIME_DEFAULT_VALUE,
@@ -201,12 +204,24 @@ static void zigbee_task(void* params)
     esp_zb_cluster_list_t* cluster_list = esp_zb_ep_list_get_ep(dimm_switch_ep, endpoint_id);
     ABORT_IF_FALSE(cluster_list, ESP_ERR_INVALID_ARG, TAG, "Failed to find endpoint id: %d in list: %p", endpoint_id, dimm_switch_ep);
     esp_zb_attribute_list_t* basic_cluster = esp_zb_cluster_list_get_cluster(cluster_list, ESP_ZB_ZCL_CLUSTER_ID_BASIC, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
-    ABORT_IF_FALSE(basic_cluster, ESP_ERR_INVALID_ARG, TAG, "Failed to find basic cluster in endpoint: %d", endpoint_id);
-    ESP_ERROR_CHECK(esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_MANUFACTURER_NAME_ID, "Citelao"));
-    ESP_ERROR_CHECK(esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_MODEL_IDENTIFIER_ID, "ESP32 Switch"));
+    ABORT_IF_FALSE(basic_cluster, ESP_ERR_INVALID_ARG, TAG, "Faild to find basic cluster in endpoint: %d", endpoint_id);
+
+    // Must be prefixed with string length, excluding null terminator.
+    // https://github.com/espressif/esp-zigbee-sdk/blob/main/examples/esp_zigbee_HA_sample/HA_on_off_light/main/esp_zb_light.h#L27
+    // https://esp32.com/viewtopic.php?t=33143
+    //
+    // See Section 2.6.2.12 "Character String" in Zigbee Cluster Library Specification
+    // https://zigbeealliance.org/wp-content/uploads/2019/12/07-5123-06-zigbee-cluster-library-specification.pdf
+    // via https://github.com/espressif/esp-zigbee-sdk/issues/202#issuecomment-1919594141
+    ESP_ERROR_CHECK(esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_MANUFACTURER_NAME_ID, "\x07" "Citelao"));
+    ESP_ERROR_CHECK(esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_MODEL_IDENTIFIER_ID, "\x0b" "ESP32 Switch"));
 
     ESP_ERROR_CHECK(esp_zb_device_register(dimm_switch_ep));
     ESP_ERROR_CHECK(esp_zb_set_primary_network_channel_set((1l << 13)));
+
+    // Because we call with `false`, esp_zb_app_signal_handler will get a
+    // `ESP_ZB_ZDO_SIGNAL_SKIP_STARTUP` message, and we must start commissioning
+    // manually.
     ESP_ERROR_CHECK(esp_zb_start(false));
     esp_zb_stack_main_loop();
 }
