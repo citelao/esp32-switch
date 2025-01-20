@@ -61,7 +61,6 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t* signal_struct)
     uint32_t* p_sg_p = signal_struct->p_app_signal;
     esp_err_t err_status = signal_struct->esp_err_status;
     esp_zb_app_signal_type_t sig_type = *p_sg_p;
-    esp_zb_zdo_signal_device_annce_params_t* dev_annce_params = NULL;
     switch (sig_type) {
     case ESP_ZB_ZDO_SIGNAL_SKIP_STARTUP:
         // Called with no_autostart. We must start commissioning.
@@ -70,6 +69,7 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t* signal_struct)
         ESP_LOGI(TAG, "Manually starting commissioning");
         esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_INITIALIZATION);
         break;
+
     case ESP_ZB_BDB_SIGNAL_DEVICE_FIRST_START:
     case ESP_ZB_BDB_SIGNAL_DEVICE_REBOOT:
         ESP_LOGI(TAG, "Device started for the first time or rebooted");
@@ -97,6 +97,45 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t* signal_struct)
                                    ESP_ZB_BDB_MODE_INITIALIZATION, 1000);
         }
         break;
+
+    case ESP_ZB_BDB_SIGNAL_STEERING:
+        if (err_status == ESP_OK)
+        {
+            ESP_LOGI(TAG, "Network steering started");
+        }
+        else
+        {
+            ESP_LOGW(TAG, "Network steering failed with status: %s", esp_err_to_name(err_status));
+        }
+        break;
+
+    case ESP_ZB_ZDO_SIGNAL_DEVICE_ANNCE:
+        esp_zb_zdo_signal_device_annce_params_t* dev_annce_params = (esp_zb_zdo_signal_device_annce_params_t*)esp_zb_app_signal_get_params(p_sg_p);
+        ESP_LOGI(TAG, "New device commissioned or rejoined (short: 0x%04hx)", dev_annce_params->device_short_addr);
+
+        // esp_zb_zdo_match_desc_req_param_t cmd_req;
+        // cmd_req.dst_nwk_addr = dev_annce_params->device_short_addr;
+        // cmd_req.addr_of_interest = dev_annce_params->device_short_addr;
+        // esp_zb_zdo_find_color_dimmable_light(&cmd_req, user_find_cb, NULL);
+        break;
+
+    case ESP_ZB_NWK_SIGNAL_PERMIT_JOIN_STATUS:
+        ESP_LOGI(TAG, "Permit join status: %s", esp_err_to_name(err_status));
+        if (err_status == ESP_OK)
+        {
+            uint8_t* open_seconds = (uint8_t*)esp_zb_app_signal_get_params(p_sg_p);
+            uint16_t pan_id = esp_zb_get_pan_id();
+            if (*open_seconds)
+            {
+                ESP_LOGI(TAG, "Network (0x%04hx) is open for %d seconds", pan_id, *open_seconds);
+            }
+            else
+            {
+                ESP_LOGW(TAG, "Network (0x%04hx) is closed", pan_id);
+            }
+        }
+        break;
+
     default:
         ESP_LOGI(TAG, "ZDO signal: %s (0x%x), status: %s", esp_zb_zdo_signal_to_string(sig_type), sig_type,
                  esp_err_to_name(err_status));
