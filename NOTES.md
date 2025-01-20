@@ -1,3 +1,19 @@
+# "Coordinator" vs "router" vs "end device"
+
+> What's a Zigbee coordinator vs a router vs an end device?
+
+Via [Silicon Labs](https://community.silabs.com/s/article/what-is-the-difference-between-an-end-device-a-router-and-a-coordinator-do-i?language=en_US), emphasis added:
+
+> In ZigBee, there are three different types of devices: end device, router, and coordinator. The key difference between these is that an **end device** can not route traffic, **routers** can route traffic, and the **coordinator**, in addition to routing traffic, is responsible for forming the network in the first place. Every network must have one and only one coordinator.
+
+Also, **end devices** "may also sleep", whereas **routers** "may not sleep" (at least in some implementations?):
+
+> Because **end devices** may sleep, all traffic to an end device is first routed to its parent. The end device is responsible for requesting any pending messages from its parent. If an end device has moved, it is responsible for informing the network that it has rejoined to a new parent.
+>
+> [...] **Routers** are also responsible for receiving and storing messages intended for their children.
+
+Seriously, read [their brief page](https://community.silabs.com/s/article/what-is-the-difference-between-an-end-device-a-router-and-a-coordinator-do-i?language=en_US). See also [Digi](https://www.digi.com/resources/documentation/Digidocs/90002002/Concepts/c_device_types.htm?TocPath=Zigbee%20networks%7CZigbee%20networking%20concepts%7C_____1).
+
 # `esp_zb_scheduler_user_alarm` vs `esp_zb_scheduler_alarm`
 
 > What's the difference between `esp_zb_scheduler_user_alarm` and `esp_zb_scheduler_alarm`?
