@@ -277,9 +277,9 @@ static void zigbee_task(void* params)
         .model_identifier = "\x07" "esp32c6",
     };
     ESP_ERROR_CHECK(esp_zcl_utility_add_ep_basic_manufacturer_info(dimm_switch_ep, endpoint_id, &manufacturer_info));
-    esp_zb_core_action_handler_register(action_handler);
     ESP_ERROR_CHECK(esp_zb_device_register(dimm_switch_ep));
-    ESP_ERROR_CHECK(esp_zb_set_primary_network_channel_set((1l << 13)));
+    esp_zb_core_action_handler_register(action_handler);
+    ESP_ERROR_CHECK(esp_zb_set_primary_network_channel_set(ESP_ZB_TRANSCEIVER_ALL_CHANNELS_MASK));
 
     // Because we call with `false`, esp_zb_app_signal_handler will get a
     // `ESP_ZB_ZDO_SIGNAL_SKIP_STARTUP` message, and we must start commissioning
@@ -354,5 +354,5 @@ void app_main(void)
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(esp_zb_platform_config(&config));
     xTaskCreate(zigbee_task, "zigbee_task", 4096, NULL, 5, NULL);
-    xTaskCreate(old_loop, "old_loop", 4096, NULL, 5, NULL);
+    // xTaskCreate(old_loop, "old_loop", 4096, NULL, 5, NULL);
 }
