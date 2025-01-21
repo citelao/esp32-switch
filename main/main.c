@@ -31,6 +31,14 @@ static bool isPressed = false;
         } \
     } while (0)
 
+#define RETURN_IF_FALSE(cond, err, tag, fmt, ...) \
+    do { \
+        if (!(cond)) { \
+            ESP_LOGE(tag, fmt, ##__VA_ARGS__); \
+            return err; \
+        } \
+    } while (0)
+
 void blink(void *arg)
 {
     static bool led_state = false;
@@ -172,6 +180,39 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t* signal_struct)
     }
 }
 
+static esp_err_t action_handler(esp_zb_core_action_callback_id_t callback_id, const void *message)
+{
+    switch (callback_id)
+    {
+    default:
+        ESP_LOGW(TAG, "Receive Zigbee action(0x%x) callback", callback_id);
+        break;
+    }
+
+    return ESP_OK;
+}
+
+typedef struct zcl_basic_manufacturer_info_s {
+    char *manufacturer_name;
+    char *model_identifier;
+} zcl_basic_manufacturer_info_t;
+esp_err_t esp_zcl_utility_add_ep_basic_manufacturer_info(esp_zb_ep_list_t *ep_list, uint8_t endpoint_id, zcl_basic_manufacturer_info_t *info)
+{
+    esp_err_t ret = ESP_OK;
+    esp_zb_cluster_list_t *cluster_list = NULL;
+    esp_zb_attribute_list_t *basic_cluster = NULL;
+
+    cluster_list = esp_zb_ep_list_get_ep(ep_list, endpoint_id);
+    RETURN_IF_FALSE(cluster_list, ESP_ERR_INVALID_ARG, TAG, "Failed to find endpoint id: %d in list: %p", endpoint_id, ep_list);
+    basic_cluster = esp_zb_cluster_list_get_cluster(cluster_list, ESP_ZB_ZCL_CLUSTER_ID_BASIC, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+    RETURN_IF_FALSE(basic_cluster, ESP_ERR_INVALID_ARG, TAG, "Failed to find basic cluster in endpoint: %d", endpoint_id);
+    RETURN_IF_FALSE((info && info->manufacturer_name), ESP_ERR_INVALID_ARG, TAG, "Invalid manufacturer name");
+    ESP_ERROR_CHECK(esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_MANUFACTURER_NAME_ID, info->manufacturer_name));
+    RETURN_IF_FALSE((info && info->model_identifier), ESP_ERR_INVALID_ARG, TAG, "Invalid model identifier");
+    ESP_ERROR_CHECK(esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_MODEL_IDENTIFIER_ID, info->model_identifier));
+    return ret;
+}
+
 static void zigbee_task(void* params)
 {
     esp_zb_cfg_t zb_nwk_cfg = {
@@ -200,22 +241,27 @@ static void zigbee_task(void* params)
     uint8_t endpoint_id = 1;
     esp_zb_ep_list_t* dimm_switch_ep = esp_zb_color_dimmable_switch_ep_create(endpoint_id, &switch_cfg);
 
-    // https://github.com/espressif/esp-idf/blob/master/examples/zigbee/common/zcl_utility/src/zcl_utility.c
-    esp_zb_cluster_list_t* cluster_list = esp_zb_ep_list_get_ep(dimm_switch_ep, endpoint_id);
-    ABORT_IF_FALSE(cluster_list, ESP_ERR_INVALID_ARG, TAG, "Failed to find endpoint id: %d in list: %p", endpoint_id, dimm_switch_ep);
-    esp_zb_attribute_list_t* basic_cluster = esp_zb_cluster_list_get_cluster(cluster_list, ESP_ZB_ZCL_CLUSTER_ID_BASIC, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
-    ABORT_IF_FALSE(basic_cluster, ESP_ERR_INVALID_ARG, TAG, "Faild to find basic cluster in endpoint: %d", endpoint_id);
+    // // https://github.com/espressif/esp-idf/blob/master/examples/zigbee/common/zcl_utility/src/zcl_utility.c
+    // esp_zb_cluster_list_t* cluster_list = esp_zb_ep_list_get_ep(dimm_switch_ep, endpoint_id);
+    // ABORT_IF_FALSE(cluster_list, ESP_ERR_INVALID_ARG, TAG, "Failed to find endpoint id: %d in list: %p", endpoint_id, dimm_switch_ep);
+    // esp_zb_attribute_list_t* basic_cluster = esp_zb_cluster_list_get_cluster(cluster_list, ESP_ZB_ZCL_CLUSTER_ID_BASIC, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+    // ABORT_IF_FALSE(basic_cluster, ESP_ERR_INVALID_ARG, TAG, "Failed to find basic cluster in endpoint: %d", endpoint_id);
 
-    // Must be prefixed with string length, excluding null terminator.
-    // https://github.com/espressif/esp-zigbee-sdk/blob/main/examples/esp_zigbee_HA_sample/HA_on_off_light/main/esp_zb_light.h#L27
-    // https://esp32.com/viewtopic.php?t=33143
-    //
-    // See Section 2.6.2.12 "Character String" in Zigbee Cluster Library Specification
-    // https://zigbeealliance.org/wp-content/uploads/2019/12/07-5123-06-zigbee-cluster-library-specification.pdf
-    // via https://github.com/espressif/esp-zigbee-sdk/issues/202#issuecomment-1919594141
-    ESP_ERROR_CHECK(esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_MANUFACTURER_NAME_ID, "\x07" "Citelao"));
-    ESP_ERROR_CHECK(esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_MODEL_IDENTIFIER_ID, "\x0b" "ESP32 Switch"));
-
+    // // Must be prefixed with string length, excluding null terminator.
+    // // https://github.com/espressif/esp-zigbee-sdk/blob/main/examples/esp_zigbee_HA_sample/HA_on_off_light/main/esp_zb_light.h#L27
+    // // https://esp32.com/viewtopic.php?t=33143
+    // //
+    // // See Section 2.6.2.12 "Character String" in Zigbee Cluster Library Specification
+    // // https://zigbeealliance.org/wp-content/uploads/2019/12/07-5123-06-zigbee-cluster-library-specification.pdf
+    // // via https://github.com/espressif/esp-zigbee-sdk/issues/202#issuecomment-1919594141
+    // ESP_ERROR_CHECK(esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_MANUFACTURER_NAME_ID, "\x09" "ESPRESSIF"));
+    // ESP_ERROR_CHECK(esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_MODEL_IDENTIFIER_ID, "\x07" "esp32c6"));
+    zcl_basic_manufacturer_info_t manufacturer_info = {
+        .manufacturer_name = "\x09" "ESPRESSIF",
+        .model_identifier = "\x07" "esp32c6",
+    };
+    ESP_ERROR_CHECK(esp_zcl_utility_add_ep_basic_manufacturer_info(dimm_switch_ep, endpoint_id, &manufacturer_info));
+    esp_zb_core_action_handler_register(action_handler);
     ESP_ERROR_CHECK(esp_zb_device_register(dimm_switch_ep));
     ESP_ERROR_CHECK(esp_zb_set_primary_network_channel_set((1l << 13)));
 
