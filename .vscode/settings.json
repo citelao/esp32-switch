@@ -14,7 +14,8 @@
         "esp_err.h": "c",
         "led_strip.h": "c",
         "esp_zigbee_core.h": "c",
-        "nvs_flash.h": "c"
+        "nvs_flash.h": "c",
+        "esp_zigbee_trace.h": "c"
     },
     "idf.flashType": "UART"
 }

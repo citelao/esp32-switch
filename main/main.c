@@ -5,11 +5,20 @@
 #include <esp_timer.h>
 #include <led_strip.h>
 #include <esp_zigbee_core.h>
+#include <esp_zigbee_trace.h>
 #include <zboss_api.h>
 #include <zcl/zb_zcl_basic.h>
 #include <zcl/esp_zigbee_zcl_basic.h>
 #include <ha/esp_zigbee_ha_standard.h>
 #include <nvs_flash.h>
+
+#if !defined CONFIG_ZB_ENABLED
+#error Define ZB_ENABLED in idf.py menuconfig to compile Zigbee source code.
+#endif
+
+#if !defined CONFIG_ZB_ZCZR
+#error Define ZB_ZCZR in idf.py menuconfig to compile light (Router) source code.
+#endif
 
 static const char *TAG = "CITELAO_ESP32_SWITCH";
 
@@ -74,7 +83,7 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t* signal_struct)
         // Called with no_autostart. We must start commissioning.
         // https://ncsdoc.z6.web.core.windows.net/zboss/3.11.1.177/using_zigbee__z_c_l.html#:~:text=The%20application%20should%20later%20call%20ZBOSS%20commissioning%20initiation%20%E2%80%93%20bdb_start_top_level_commissioning(ZB_BDB_NETWORK_STEERING)%20that%20will%20trigger%20further%20commissioning.
         // https://github.com/espressif/esp-zigbee-sdk/blob/8114916a4c6d1b4587a9fc24d2c85a1396328a28/examples/esp_zigbee_HA_sample/HA_color_dimmable_switch/main/esp_zb_switch.c#L143C10-L143C40
-        ESP_LOGI(TAG, "Manually starting commissioning");
+        ESP_LOGI(TAG, "Manually initializing Zigbee stack (starting commissioning)");
         esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_INITIALIZATION);
         break;
 
@@ -215,6 +224,13 @@ esp_err_t esp_zcl_utility_add_ep_basic_manufacturer_info(esp_zb_ep_list_t *ep_li
 
 static void zigbee_task(void* params)
 {
+#if defined CONFIG_ZB_DEBUG_MODE && CONFIG_ZB_DEBUG_MODE
+    // Enable debugging.
+    // Make sure to replace partitions.csv with partitions.debug.csv.
+    // https://docs.espressif.com/projects/esp-zigbee-sdk/en/latest/esp32/developing.html#enable-debug-mode-and-trace-logging
+    esp_zb_set_trace_level_mask(ESP_ZB_TRACE_LEVEL_INFO, ESP_ZB_TRACE_SUBSYSTEM_COMMON | ESP_ZB_TRACE_SUBSYSTEM_ZCL | ESP_ZB_TRACE_SUBSYSTEM_ZLL);
+#endif
+
     esp_zb_cfg_t zb_nwk_cfg = {
         // TODO: make this an End Device so we can sleep.
         .esp_zb_role = ESP_ZB_DEVICE_TYPE_ROUTER,
