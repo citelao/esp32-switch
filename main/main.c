@@ -31,6 +31,7 @@ static const uint8_t SWITCH_GPIO_PIN = GPIO_NUM_9;
 
 static led_strip_handle_t led_strip = NULL;
 static bool isPressed = false;
+static bool isIdentifying = false;
 
 #define ABORT_IF_FALSE(cond, err, tag, fmt, ...) \
     do { \
@@ -47,20 +48,6 @@ static bool isPressed = false;
             return err; \
         } \
     } while (0)
-
-
-static bool isIdentifying = false;
-void blink(void *arg)
-{
-    static bool led_state = false;
-    // ESP_LOGI(TAG, "Blinking %s", led_state ? "on" : "off");
-
-    led_state = !led_state;
-    int g = !led_state && isPressed ? 255 : 0;
-    int b = led_state && isIdentifying ? 255 : 0;
-    ESP_ERROR_CHECK(led_strip_set_pixel(led_strip, 0, led_state ? 255 : 0, g, b));
-    ESP_ERROR_CHECK(led_strip_refresh(led_strip));
-}
 
 static void IRAM_ATTR switch_pressed(void *arg)
 {
@@ -216,7 +203,6 @@ static void identify_cb(uint8_t identify_on)
 {
     ESP_LOGI(TAG, "Identify %s", identify_on ? "on" : "off");
     isIdentifying = identify_on;
-    blink(NULL);
 }
 
 typedef struct zcl_basic_manufacturer_info_s {
@@ -342,6 +328,30 @@ static void zigbee_task(void* params)
     esp_zb_stack_main_loop();
 }
 
+// color struct
+typedef struct {
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+} color_t;
+
+static const color_t idle_color = { .r = 0x80, .g = 0x00, .b = 0x80 };
+static const color_t identifying_color = { .r = 0x00, .g = 0x40, .b = 0x00 };
+static const color_t pressed_color = { .r = 0x70, .g = 0x40, .b = 0x00 };
+
+// Generate 60 steps of brightness ramp from 0 to 1
+static const int brightness_steps = 58;
+static const double brightness_ramp[58] = {
+    0.000000, 0.017544, 0.035088, 0.052632, 0.070175, 0.087719, 0.105263, 0.122807,
+    0.140351, 0.157895, 0.175439, 0.192982, 0.210526, 0.228070, 0.245614, 0.263158,
+    0.280702, 0.298246, 0.315789, 0.333333, 0.350877, 0.368421, 0.385965, 0.403509,
+    0.421053, 0.438596, 0.456140, 0.473684, 0.491228, 0.508772, 0.526316, 0.543860,
+    0.561404, 0.578947, 0.596491, 0.614035, 0.631579, 0.649123, 0.666667, 0.684211,
+    0.701754, 0.719298, 0.736842, 0.754386, 0.771930, 0.789474, 0.807018, 0.824561,
+    0.842105, 0.859649, 0.877193, 0.894737, 0.912281, 0.929825, 0.947368, 0.964912,
+    0.982456, 1.000000
+};
+
 void old_loop(void* params)
 {
     // Configure the BOOT button as input
@@ -386,10 +396,33 @@ void old_loop(void* params)
 
     ESP_LOGI(TAG, "Configuring LED on GPIO %d", LED_GPIO_PIN);
 
+    int brightness_idx = brightness_steps - 1;
+    int delta = -1;
     while (1)
     {
-        blink(NULL);
-        vTaskDelay(500 / portTICK_PERIOD_MS);
+        if (isPressed)
+        {
+            brightness_idx = brightness_steps - 1;
+        }
+        else
+        {
+            // adjust the delta
+            if (brightness_idx <= 0)
+            {
+                delta = 1;
+            }
+            else if (brightness_idx >= brightness_steps - 1)
+            {
+                delta = -1;
+            }
+        }
+        brightness_idx += delta;
+
+        const color_t color_to_use = isIdentifying ? identifying_color : isPressed ? pressed_color : idle_color;
+        const double brightness = brightness_ramp[brightness_idx];
+        ESP_ERROR_CHECK(led_strip_set_pixel(led_strip, 0, color_to_use.r * brightness, color_to_use.g * brightness, color_to_use.b * brightness));
+        ESP_ERROR_CHECK(led_strip_refresh(led_strip));
+        vTaskDelay(50 / portTICK_PERIOD_MS);
     }
 }
 
