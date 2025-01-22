@@ -389,5 +389,5 @@ void app_main(void)
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(esp_zb_platform_config(&config));
     xTaskCreate(zigbee_task, "zigbee_task", 4096, NULL, 5, NULL);
-    // xTaskCreate(old_loop, "old_loop", 4096, NULL, 5, NULL);
+    xTaskCreate(old_loop, "old_loop", 4096, NULL, 5, NULL);
 }
