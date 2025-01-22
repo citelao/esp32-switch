@@ -204,6 +204,12 @@ static esp_err_t action_handler(esp_zb_core_action_callback_id_t callback_id, co
     return ESP_OK;
 }
 
+// In Z2M dev console:
+// Endpoint: (whatever endpoint has the identify cluster; prob 0x01)
+// Cluster: 0x03
+// Command: 0x00
+// Payload: {"identifytime": 3}
+//      (time in seconds; case-sensitive)
 static void identify_cb(uint8_t identify_on)
 {
     ESP_LOGI(TAG, "Identify %s", identify_on ? "on" : "off");
