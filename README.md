@@ -30,3 +30,18 @@ Yay!
 2. Enable Zigbee (at the bottom)
 
 https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/kconfig/configuration_structure.html#sdkconfig-file
+
+### Cannot interview with Zigbee2MQTT
+
+Something like:
+
+> Error: Interview failed because can not get node descriptor
+
+Also applies if metadata is outdated on Z2M after making firmware changes.
+
+1. Delete the device from Z2M ("Force delete" is OK).
+2. **ESP-IDF: Erase Flash Memory From Device**.
+3. Re-flash the device.
+4. (If you made changes to clusters/stuff that is "cached" by Z2M): Restart Z2M.
+
+https://github.com/Koenkk/zigbee2mqtt/issues/24202
