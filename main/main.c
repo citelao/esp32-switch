@@ -48,6 +48,8 @@ static bool isPressed = false;
         } \
     } while (0)
 
+
+static bool isIdentifying = false;
 void blink(void *arg)
 {
     static bool led_state = false;
@@ -55,7 +57,8 @@ void blink(void *arg)
 
     led_state = !led_state;
     int g = !led_state && isPressed ? 255 : 0;
-    ESP_ERROR_CHECK(led_strip_set_pixel(led_strip, 0, led_state ? 255 : 0, g, 0));
+    int b = led_state && isIdentifying ? 255 : 0;
+    ESP_ERROR_CHECK(led_strip_set_pixel(led_strip, 0, led_state ? 255 : 0, g, b));
     ESP_ERROR_CHECK(led_strip_refresh(led_strip));
 }
 
@@ -201,6 +204,13 @@ static esp_err_t action_handler(esp_zb_core_action_callback_id_t callback_id, co
     return ESP_OK;
 }
 
+static void identify_cb(uint8_t identify_on)
+{
+    ESP_LOGI(TAG, "Identify %s", identify_on ? "on" : "off");
+    isIdentifying = identify_on;
+    blink(NULL);
+}
+
 typedef struct zcl_basic_manufacturer_info_s {
     char *manufacturer_name;
     char *model_identifier;
@@ -314,6 +324,7 @@ static void zigbee_task(void* params)
     ESP_ERROR_CHECK(esp_zcl_utility_add_ep_basic_manufacturer_info(dimm_switch_ep, endpoint_id, &manufacturer_info));
     ESP_ERROR_CHECK(esp_zb_device_register(dimm_switch_ep));
     esp_zb_core_action_handler_register(action_handler);
+    esp_zb_identify_notify_handler_register(endpoint_id, identify_cb);
     ESP_ERROR_CHECK(esp_zb_set_primary_network_channel_set(ESP_ZB_TRANSCEIVER_ALL_CHANNELS_MASK));
 
     // Because we call with `false`, esp_zb_app_signal_handler will get a
