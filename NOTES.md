@@ -26,6 +26,13 @@ https://github.com/SiliconLabs/zigbee_applications/blob/master/zigbee_concepts/Z
 
 https://medium.com/@omaslyuchenko/hello-zigbee-world-part-15-commands-binding-133567d690b9
 
+## How do I send "identify" from Z2M?
+
+1. Dev Console for your device
+2. Endpoint `1`, Cluster `3`, Command `0`, Payload a la `{"identifytime": 3}` (time in seconds; case-sensitive)
+
+https://medium.com/@omaslyuchenko/hello-zigbee-part-22-identify-cluster-90cf12680306
+
 ---
 
 # SDK questions
