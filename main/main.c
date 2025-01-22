@@ -67,7 +67,9 @@ static void IRAM_ATTR switch_pressed(void *arg)
     isPressed = !isPressed;
 
     // Stack overflows in an ISR handler because of the stack maxes.
+    // https://github.com/espressif/esp-zigbee-sdk/blob/8114916a4c6d1b4587a9fc24d2c85a1396328a28/examples/esp_zigbee_HA_sample/HA_color_dimmable_switch/main/esp_zb_switch.c#L67
     // ESP_LOGI(TAG, "Switch %s", isPressed ? "pressed" : "released");
+    ESP_EARLY_LOGI(TAG, "Switch %s", isPressed ? "pressed" : "released");
 }
 
 static void start_top_level_commissioning(uint8_t mode_mask)
