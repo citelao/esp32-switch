@@ -243,19 +243,54 @@ static void zigbee_task(void* params)
     };
     esp_zb_init(&zb_nwk_cfg);
 
-    esp_zb_color_dimmable_switch_cfg_t switch_cfg = {
+    // esp_zb_color_dimmable_switch_cfg_t switch_cfg = {
+    //     .basic_cfg = {
+    //         .zcl_version = ESP_ZB_ZCL_BASIC_ZCL_VERSION_DEFAULT_VALUE,
+    //         // TODO: correctly report battery.
+    //         // .power_source = ZB_ZCL_BASIC_POWER_SOURCE_BATTERY,
+    //         .power_source = ESP_ZB_ZCL_BASIC_POWER_SOURCE_DEFAULT_VALUE,
+    //     },
+    //     .identify_cfg = {
+    //         .identify_time = ESP_ZB_ZCL_IDENTIFY_IDENTIFY_TIME_DEFAULT_VALUE,
+    //     },
+    // };
+    uint8_t endpoint_id = 1;
+    // esp_zb_ep_list_t* dimm_switch_ep = esp_zb_color_dimmable_switch_ep_create(endpoint_id, &switch_cfg);
+
+    esp_zb_color_dimmable_light_cfg_t light_cfg = {
         .basic_cfg = {
             .zcl_version = ESP_ZB_ZCL_BASIC_ZCL_VERSION_DEFAULT_VALUE,
-            // TODO: correctly report battery.
-            // .power_source = ZB_ZCL_BASIC_POWER_SOURCE_BATTERY,
             .power_source = ESP_ZB_ZCL_BASIC_POWER_SOURCE_DEFAULT_VALUE,
         },
         .identify_cfg = {
             .identify_time = ESP_ZB_ZCL_IDENTIFY_IDENTIFY_TIME_DEFAULT_VALUE,
         },
+        .groups_cfg = {
+            .groups_name_support_id = ESP_ZB_ZCL_GROUPS_NAME_SUPPORT_DEFAULT_VALUE,
+        },
+        .scenes_cfg = {
+            .scenes_count = ESP_ZB_ZCL_SCENES_SCENE_COUNT_DEFAULT_VALUE,
+            .current_scene = ESP_ZB_ZCL_SCENES_CURRENT_SCENE_DEFAULT_VALUE,
+            .current_group = ESP_ZB_ZCL_SCENES_CURRENT_GROUP_DEFAULT_VALUE,
+            .scene_valid = ESP_ZB_ZCL_SCENES_SCENE_VALID_DEFAULT_VALUE,
+            .name_support = ESP_ZB_ZCL_SCENES_NAME_SUPPORT_DEFAULT_VALUE,
+        },
+        .on_off_cfg = {
+            .on_off = ESP_ZB_ZCL_ON_OFF_ON_OFF_DEFAULT_VALUE,
+        },
+        .level_cfg = {
+            .current_level = ESP_ZB_ZCL_LEVEL_CONTROL_CURRENT_LEVEL_DEFAULT_VALUE,
+        },
+        .color_cfg = {
+            .current_x = ESP_ZB_ZCL_COLOR_CONTROL_CURRENT_X_DEF_VALUE,
+            .current_y = ESP_ZB_ZCL_COLOR_CONTROL_CURRENT_Y_DEF_VALUE,
+            .color_mode = ESP_ZB_ZCL_COLOR_CONTROL_COLOR_MODE_DEFAULT_VALUE,
+            .options = ESP_ZB_ZCL_COLOR_CONTROL_OPTIONS_DEFAULT_VALUE,
+            .enhanced_color_mode = ESP_ZB_ZCL_COLOR_CONTROL_ENHANCED_COLOR_MODE_DEFAULT_VALUE,
+            .color_capabilities = 0x0008,
+        },
     };
-    uint8_t endpoint_id = 1;
-    esp_zb_ep_list_t* dimm_switch_ep = esp_zb_color_dimmable_switch_ep_create(endpoint_id, &switch_cfg);
+    esp_zb_ep_list_t* dimm_light_ep = esp_zb_color_dimmable_light_ep_create(endpoint_id, &light_cfg);
 
     // // https://github.com/espressif/esp-idf/blob/master/examples/zigbee/common/zcl_utility/src/zcl_utility.c
     // esp_zb_cluster_list_t* cluster_list = esp_zb_ep_list_get_ep(dimm_switch_ep, endpoint_id);
@@ -276,8 +311,8 @@ static void zigbee_task(void* params)
         .manufacturer_name = "\x09" "ESPRESSIF",
         .model_identifier = "\x07" "esp32c6",
     };
-    ESP_ERROR_CHECK(esp_zcl_utility_add_ep_basic_manufacturer_info(dimm_switch_ep, endpoint_id, &manufacturer_info));
-    ESP_ERROR_CHECK(esp_zb_device_register(dimm_switch_ep));
+    ESP_ERROR_CHECK(esp_zcl_utility_add_ep_basic_manufacturer_info(dimm_light_ep, endpoint_id, &manufacturer_info));
+    ESP_ERROR_CHECK(esp_zb_device_register(dimm_light_ep));
     esp_zb_core_action_handler_register(action_handler);
     ESP_ERROR_CHECK(esp_zb_set_primary_network_channel_set(ESP_ZB_TRANSCEIVER_ALL_CHANNELS_MASK));
 
