@@ -26,6 +26,17 @@ https://github.com/SiliconLabs/zigbee_applications/blob/master/zigbee_concepts/Z
 
 https://medium.com/@omaslyuchenko/hello-zigbee-world-part-15-commands-binding-133567d690b9
 
+## `RW` vs `R/W` vs `R*W`?
+
+What's the difference between the 3 terms?
+
+* `RW`: readable & writeable
+* `R/W`: readable & writeable
+* `R*W`: readable & *optionally* writeable 
+
+See [Zigbee Cluster Library Specification](https://zigbeealliance.org/wp-content/uploads/2019/12/07-5123-06-zigbee-cluster-library-specification.pdf) **1.2 Acronyms and Abbreviations** (page 1-3).
+
+
 ## How do I send "identify" from Z2M?
 
 1. Dev Console for your device
