@@ -22,6 +22,20 @@ Inner loop:
 
 Yay!
 
+### Usage: bind to a light
+
+In Z2M:
+
+1. Click on the switch to open the details page.
+2. Click **Bind**
+3. In **Destination** & **endpoint**, select the light you wish to control
+4. Check **LevelCtrl**, **OnOff**, and **LColorCtlr**
+5. Click **Bind** (the switch does not currently sleep, but if it does, you may
+   need to wake it up by pressing any button on it.)
+
+The button will now control your light!
+
+
 ## Troubleshooting
 
 ### Zigbee headers not present

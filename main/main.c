@@ -57,6 +57,18 @@ static void IRAM_ATTR switch_pressed(void *arg)
     // https://github.com/espressif/esp-zigbee-sdk/blob/8114916a4c6d1b4587a9fc24d2c85a1396328a28/examples/esp_zigbee_HA_sample/HA_color_dimmable_switch/main/esp_zb_switch.c#L67
     // ESP_LOGI(TAG, "Switch %s", isPressed ? "pressed" : "released");
     ESP_EARLY_LOGI(TAG, "Switch %s", isPressed ? "pressed" : "released");
+
+    // TODO: do through a queue?
+    esp_zb_zcl_move_to_level_cmd_t cmd = {
+        .address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
+        .zcl_basic_cmd = {},
+        .level = isPressed ? 0xFF : 0x00,
+        .transition_time = 10,
+    };
+    uint8_t endpoint_id = 1; // TODO: share
+    cmd.zcl_basic_cmd.src_endpoint = endpoint_id;
+    uint8_t seq_num = esp_zb_zcl_level_move_to_level_with_onoff_cmd_req(&cmd);
+    ESP_EARLY_LOGI(TAG, "Move to level command sent (seq_num: %d)", seq_num);
 }
 
 static void start_top_level_commissioning(uint8_t mode_mask)
