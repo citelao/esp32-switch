@@ -63,7 +63,7 @@ static void IRAM_ATTR switch_pressed(void *arg)
         .address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
         .zcl_basic_cmd = {},
         .level = isPressed ? 0xFF : 0x00,
-        .transition_time = 10,
+        .transition_time = 1,
     };
     uint8_t endpoint_id = 1; // TODO: share
     cmd.zcl_basic_cmd.src_endpoint = endpoint_id;
