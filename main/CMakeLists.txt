@@ -4,4 +4,5 @@ idf_component_register(SRCS "main.c"
                     REQUIRES esp_driver_ledc
                     REQUIRES esp_driver_gpio
                     REQUIRES esp_timer
-                    REQUIRES nvs_flash)
+                    REQUIRES nvs_flash
+                    REQUIRES debouncer)

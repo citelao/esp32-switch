@@ -11,6 +11,7 @@
 #include <zcl/esp_zigbee_zcl_basic.h>
 #include <ha/esp_zigbee_ha_standard.h>
 #include <nvs_flash.h>
+#include <debouncer.h>
 
 #if !defined CONFIG_ZB_ENABLED
 #error Define ZB_ENABLED in idf.py menuconfig to compile Zigbee source code.
@@ -49,7 +50,7 @@ static bool isIdentifying = false;
         } \
     } while (0)
 
-static void IRAM_ATTR switch_pressed(void *arg)
+static void IRAM_ATTR switch_pressed(gpio_num_t pin /*, void *arg*/)
 {
     // TODO: debounce
     isPressed = !isPressed;
@@ -383,7 +384,10 @@ void old_loop(void* params)
     ESP_LOGI(TAG, "Configuring switch on GPIO %d", SWITCH_GPIO_PIN);
 
     ESP_ERROR_CHECK(gpio_install_isr_service(ESP_INTR_FLAG_LEVEL1));
-    ESP_ERROR_CHECK(gpio_isr_handler_add(SWITCH_GPIO_PIN, &switch_pressed, NULL));
+
+    ESP_ERROR_CHECK(dbnc_init(switch_pressed));
+    ESP_ERROR_CHECK(dbnc_register_switch(SWITCH_GPIO_PIN));
+    // ESP_ERROR_CHECK(gpio_isr_handler_add(SWITCH_GPIO_PIN, &switch_pressed, NULL));
 
     // https://components.espressif.com/components/espressif/led_strip
     led_strip_config_t strip_config = {
