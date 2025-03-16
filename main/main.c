@@ -51,6 +51,7 @@ static bool isIdentifying = false;
 
 static void IRAM_ATTR switch_pressed(void *arg)
 {
+    // TODO: debounce
     isPressed = !isPressed;
 
     // Stack overflows in an ISR handler because of the stack maxes.
