@@ -24,15 +24,14 @@ static void dbnc_task(void *arg)
 {
     while (1)
     {
-        gpio_num_t pin;
-        if (xQueueReceive(s_queue, &pin, portMAX_DELAY))
-        {
-            // Handle the event
-            ESP_LOGI(TAG, "Switch pressed on GPIO %d", pin);
-            ESP_ERROR_CHECK(gpio_intr_disable(pin));
-        }
-
         // TODO: simultaneously handle keypress
+        gpio_num_t pin;
+        ESP_RETURN_ON_FALSE(xQueueReceive(s_queue, &pin, portMAX_DELAY), ESP_ERR_INVALID_STATE, TAG, "Failed to receive from queue");
+
+        // Handle the event
+        ESP_LOGI(TAG, "Switch pressed on GPIO %d", pin);
+        ESP_ERROR_CHECK(gpio_intr_disable(pin));
+
         const bool isPressed = !gpio_get_level(pin);
         const dbnc_switch_state_t state = isPressed ? DBNC_SWITCH_STATE_DOWN : DBNC_SWITCH_STATE_UP;
 
