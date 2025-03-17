@@ -12,6 +12,7 @@
 #include <ha/esp_zigbee_ha_standard.h>
 #include <nvs_flash.h>
 #include <debouncer.h>
+#include <errors.h>
 
 #if !defined CONFIG_ZB_ENABLED
 #error Define ZB_ENABLED in idf.py menuconfig to compile Zigbee source code.
@@ -30,31 +31,18 @@ static const uint8_t LED_GPIO_PIN = 8;
 // Everyone says is GPIO0, but it's GPIO9.
 static const uint8_t SWITCH_GPIO_PIN = GPIO_NUM_9;
 
+// A completely random unused GPIO pin, which you can now attach a pull-up to.
+static const uint8_t ANOTHER_BUTTON_GPIO_PIN = GPIO_NUM_19;
+
 static led_strip_handle_t led_strip = NULL;
 static bool isPressed = false;
 static bool isIdentifying = false;
-
-#define ABORT_IF_FALSE(cond, err, tag, fmt, ...) \
-    do { \
-        if (!(cond)) { \
-            ESP_LOGE(tag, fmt, ##__VA_ARGS__); \
-            abort(); \
-        } \
-    } while (0)
-
-#define RETURN_IF_FALSE(cond, err, tag, fmt, ...) \
-    do { \
-        if (!(cond)) { \
-            ESP_LOGE(tag, fmt, ##__VA_ARGS__); \
-            return err; \
-        } \
-    } while (0)
 
 static void switch_pressed(gpio_num_t pin, dbnc_switch_state_t state /*, void *arg*/)
 {
     isPressed = state == DBNC_SWITCH_STATE_DOWN;
 
-    ESP_LOGI(TAG, "Switch %s", isPressed ? "pressed" : "released");
+    ESP_LOGI(TAG, "Switch %d %s", pin, isPressed ? "pressed" : "released");
 
     esp_zb_zcl_move_to_level_cmd_t cmd = {
         .address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
@@ -361,28 +349,32 @@ static const double brightness_ramp[58] = {
     0.982456, 1.000000
 };
 
-void old_loop(void* params)
+void enable_gpio_switch(gpio_num_t gpio_num)
 {
-    // Configure the BOOT button as input
-    // https://github.com/espressif/esp-zigbee-sdk/blob/main/examples/common/switch_driver/src/switch_driver.c
-    uint64_t mask = 0;
-    mask |= 1ULL << SWITCH_GPIO_PIN;
     gpio_config_t io_conf = {
         .intr_type = GPIO_INTR_ANYEDGE,
         .mode = GPIO_MODE_INPUT,
-        .pin_bit_mask = mask,
+        .pin_bit_mask = (1ULL << gpio_num),
         .pull_down_en = GPIO_PULLDOWN_ENABLE,
         .pull_up_en = GPIO_PULLUP_DISABLE,
     };
     ESP_ERROR_CHECK(gpio_config(&io_conf));
+    ESP_LOGI(TAG, "Configuring switch on GPIO %d", gpio_num);
+}
 
-    ESP_LOGI(TAG, "Configuring switch on GPIO %d", SWITCH_GPIO_PIN);
+void old_loop(void* params)
+{
+    // Configure the BOOT button as input
+    // https://github.com/espressif/esp-zigbee-sdk/blob/main/examples/common/switch_driver/src/switch_driver.c
+    enable_gpio_switch(SWITCH_GPIO_PIN);
+
+    enable_gpio_switch(ANOTHER_BUTTON_GPIO_PIN);
 
     ESP_ERROR_CHECK(gpio_install_isr_service(ESP_INTR_FLAG_LEVEL1));
 
     ESP_ERROR_CHECK(dbnc_init(switch_pressed));
     ESP_ERROR_CHECK(dbnc_register_switch(SWITCH_GPIO_PIN));
-    // ESP_ERROR_CHECK(gpio_isr_handler_add(SWITCH_GPIO_PIN, &switch_pressed, NULL));
+    ESP_ERROR_CHECK(dbnc_register_switch(ANOTHER_BUTTON_GPIO_PIN));
 
     // https://components.espressif.com/components/espressif/led_strip
     led_strip_config_t strip_config = {
