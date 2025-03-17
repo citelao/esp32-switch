@@ -20,13 +20,6 @@ static const char* TAG = "CL_DEBOUNCE";
 static QueueHandle_t s_queue = NULL;
 static dbnc_handler_t s_handler = NULL;
 
-
-typedef enum
-{
-    SWITCH_STATE_DOWN,
-    SWITCH_STATE_UP,
-} switch_state_t;
-
 static void dbnc_task(void *arg)
 {
     while (1)
@@ -40,16 +33,23 @@ static void dbnc_task(void *arg)
         }
 
         // TODO: simultaneously handle keypress
-        bool isPressed = !gpio_get_level(pin);
-        //switch_state_t state = isPressed ? SWITCH_STATE_DOWN : SWITCH_STATE_UP;
+        const bool isPressed = !gpio_get_level(pin);
+        const dbnc_switch_state_t state = isPressed ? DBNC_SWITCH_STATE_DOWN : DBNC_SWITCH_STATE_UP;
+
+        // Fire the handler as soon as we get the event.
+        s_handler(pin, state);
 
         vTaskDelay(pdMS_TO_TICKS(DBNC_DEBOUNCE_DELAY_MS));
 
-        bool isPressedAfterDelay = !gpio_get_level(pin);
-        ESP_LOGI(TAG, "Switch GPIO %d is %s, %s after delay", pin, isPressed ? "pressed" : "released", isPressedAfterDelay ? "pressed" : "released");
-        s_handler(pin);
+        // Check to see if the switch is still pressed after the delay.
+        const bool isPressedAfterDelay = !gpio_get_level(pin);
+        if (isPressed != isPressedAfterDelay)
+        {
+            // The switch state has changed, so we need to handle it again.
+            s_handler(pin, isPressedAfterDelay ? DBNC_SWITCH_STATE_DOWN : DBNC_SWITCH_STATE_UP);
+        }
 
-        // Re-enable the interrupt
+        // ESP_LOGI(TAG, "Switch GPIO %d is %s, %s after delay", pin, isPressed ? "pressed" : "released", isPressedAfterDelay ? "pressed" : "released");
         ESP_ERROR_CHECK(gpio_intr_enable(pin));
     }
 }
