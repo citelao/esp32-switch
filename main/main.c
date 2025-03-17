@@ -38,9 +38,24 @@ static led_strip_handle_t led_strip = NULL;
 static bool isPressed = false;
 static bool isIdentifying = false;
 
+static const int64_t LED_THROTTLE_MS = 100;
+static int64_t lastPressedTimeMs = 0;
+
 static void switch_pressed(gpio_num_t pin, dbnc_switch_state_t state /*, void *arg*/)
 {
     isPressed = state == DBNC_SWITCH_STATE_DOWN;
+
+    // Throttle the button *presses* to avoid overloading the Zigbee stack.
+    // TODO: this still can crash; we should probably wait for the callback from
+    // the controlled device.
+    int64_t pressTimeMicros = esp_timer_get_time();
+    int64_t pressTimeMs = pressTimeMicros / 1000; // Convert to milliseconds
+    if (isPressed && pressTimeMs - lastPressedTimeMs < LED_THROTTLE_MS)
+    {
+        ESP_LOGI(TAG, "Switch %d pressed too fast; ignoring.", pin);
+        return;
+    }
+    lastPressedTimeMs = pressTimeMs;
 
     ESP_LOGI(TAG, "Switch %d %s", pin, isPressed ? "pressed" : "released");
 
