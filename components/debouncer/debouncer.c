@@ -7,6 +7,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include <driver/gpio.h>
+#include <errors.h>
 
 // Number of events to store in the queue
 static const int DBNC_STORED_EVENTS = 10;
@@ -26,7 +27,7 @@ static void dbnc_task(void *arg)
     {
         // TODO: simultaneously handle keypress
         gpio_num_t pin;
-        ESP_RETURN_ON_FALSE(xQueueReceive(s_queue, &pin, portMAX_DELAY), ESP_ERR_INVALID_STATE, TAG, "Failed to receive from queue");
+        ABORT_IF_FALSE(xQueueReceive(s_queue, &pin, portMAX_DELAY), ESP_ERR_INVALID_STATE, TAG, "Failed to receive from queue");
 
         // Handle the event
         ESP_LOGI(TAG, "Switch pressed on GPIO %d", pin);
