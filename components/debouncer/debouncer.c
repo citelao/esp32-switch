@@ -61,6 +61,10 @@ static void IRAM_ATTR handle_switch_pressed(void *arg)
 
     // Send the GPIO number to the queue
     xQueueSendFromISR(s_queue, &gpio_num, NULL);
+
+    // BTW, logging in an ISR stackoverflows because of the stack maxes. Use
+    // ESP_EARLY_LOGI instead.
+    // https://github.com/espressif/esp-zigbee-sdk/blob/8114916a4c6d1b4587a9fc24d2c85a1396328a28/examples/esp_zigbee_HA_sample/HA_color_dimmable_switch/main/esp_zb_switch.c#L67
 }
 
 esp_err_t dbnc_init(dbnc_handler_t handler)

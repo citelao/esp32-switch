@@ -50,16 +50,12 @@ static bool isIdentifying = false;
         } \
     } while (0)
 
-static void IRAM_ATTR switch_pressed(gpio_num_t pin, dbnc_switch_state_t state /*, void *arg*/)
+static void switch_pressed(gpio_num_t pin, dbnc_switch_state_t state /*, void *arg*/)
 {
     isPressed = state == DBNC_SWITCH_STATE_DOWN;
 
-    // Stack overflows in an ISR handler because of the stack maxes.
-    // https://github.com/espressif/esp-zigbee-sdk/blob/8114916a4c6d1b4587a9fc24d2c85a1396328a28/examples/esp_zigbee_HA_sample/HA_color_dimmable_switch/main/esp_zb_switch.c#L67
-    // ESP_LOGI(TAG, "Switch %s", isPressed ? "pressed" : "released");
-    ESP_EARLY_LOGI(TAG, "Switch %s", isPressed ? "pressed" : "released");
+    ESP_LOGI(TAG, "Switch %s", isPressed ? "pressed" : "released");
 
-    // TODO: do through a queue?
     esp_zb_zcl_move_to_level_cmd_t cmd = {
         .address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
         .zcl_basic_cmd = {},

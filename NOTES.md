@@ -48,7 +48,7 @@ https://medium.com/@omaslyuchenko/hello-zigbee-part-22-identify-cluster-90cf1268
 
 # SDK questions
 
-# `esp_zb_scheduler_user_alarm` vs `esp_zb_scheduler_alarm`
+## `esp_zb_scheduler_user_alarm` vs `esp_zb_scheduler_alarm`
 
 > What's the difference between `esp_zb_scheduler_user_alarm` and `esp_zb_scheduler_alarm`?
 
@@ -60,3 +60,21 @@ esp_zb_user_cb_handle_t esp_zb_scheduler_user_alarm(esp_zb_user_callback_t cb, v
 ```
 
 https://github.com/espressif/esp-zigbee-sdk/issues/507#issuecomment-2552660985
+
+## How to add a new component?
+
+Super simple!
+
+1. Create the component dir
+2. Create the CMakeLists.txt, `.c`, & `.h` files
+3. Add a `REQUIRES` statement to the main component CMakeLists.txt
+
+https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/build-system.html#minimal-component-cmakelists
+
+## Can I log from an ISR interupt?
+
+Yes! Just use `ESP_EARLY_LOGI` instead of `ESP_LOGI`. (Also `ESP_RETURN_ON_ERROR_ISR` instead of `ESP_RETURN_ON_ERROR`).
+
+Because of stack maxes.
+
+https://github.com/espressif/esp-zigbee-sdk/blob/8114916a4c6d1b4587a9fc24d2c85a1396328a28/examples/esp_zigbee_HA_sample/HA_color_dimmable_switch/main/esp_zb_switch.c#L67
