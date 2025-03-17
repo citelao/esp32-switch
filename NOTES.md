@@ -78,3 +78,11 @@ Yes! Just use `ESP_EARLY_LOGI` instead of `ESP_LOGI`. (Also `ESP_RETURN_ON_ERROR
 Because of stack maxes.
 
 https://github.com/espressif/esp-zigbee-sdk/blob/8114916a4c6d1b4587a9fc24d2c85a1396328a28/examples/esp_zigbee_HA_sample/HA_color_dimmable_switch/main/esp_zb_switch.c#L67
+
+## Where do all the error macros live?
+
+Include `esp_check.h`.
+
+See also my `errors` component for missing macros.
+
+https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/esp_err.html
