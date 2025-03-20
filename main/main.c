@@ -8,6 +8,7 @@
 #include <esp_zigbee_trace.h>
 #include <zboss_api.h>
 #include <zcl/zb_zcl_basic.h>
+#include <zcl/zb_zcl_color_control.h>
 #include <zcl/esp_zigbee_zcl_basic.h>
 #include <ha/esp_zigbee_ha_standard.h>
 #include <nvs_flash.h>
@@ -40,6 +41,9 @@ static const uint8_t SWITCH_ENDPOINT_ID = 1;
 // MS amount to throttle sending LED commands.
 static const int64_t LED_THROTTLE_MS = 1;
 
+// MS amount to wait for a double-click.
+static const int64_t DOUBLE_CLICK_TIMEOUT_MS = 500;
+
 static led_strip_handle_t led_strip = NULL;
 static bool isIdentifying = false;
 
@@ -47,6 +51,7 @@ typedef struct {
     dbnc_switch_state_t state;
     int64_t lastChangeTimeMs;
     int64_t lastPressTimeMs;
+    int repeatCount;
 } switch_state_t;
 
 // TODO: scale to multiple switches.
@@ -54,6 +59,16 @@ static switch_state_t switchState = {
     .state = DBNC_SWITCH_STATE_UP,
     .lastChangeTimeMs = 0,
     .lastPressTimeMs = 0,
+    .repeatCount = 0,
+};
+
+// Colors!
+// https://github.com/espressif/esp-zigbee-sdk/blob/dba7ed8ef29bb2d53b622e233963a6d0f9628fea/examples/esp_zigbee_HA_sample/HA_color_dimmable_switch/main/esp_zb_switch.c
+static uint16_t color_x_table[3] = {
+    41942, 19660, 9830
+};
+static uint16_t color_y_table[3] = {
+    21626, 38321, 3932
 };
 
 static void switch_pressed(gpio_num_t pin, dbnc_switch_state_t state /*, void *arg*/)
@@ -70,6 +85,21 @@ static void switch_pressed(gpio_num_t pin, dbnc_switch_state_t state /*, void *a
         return;
     }
 
+    ESP_LOGI(TAG, "Switch %d %s", pin, isPressed ? "pressed" : "released");
+
+    // Detect double-clicks.
+    if (isPressed && now_ms - switchState.lastPressTimeMs < DOUBLE_CLICK_TIMEOUT_MS)
+    {
+        switchState.repeatCount++;
+        ESP_LOGI(TAG, "Switch %d double-clicked (%d)", pin, switchState.repeatCount);
+    }
+    else if (now_ms - switchState.lastChangeTimeMs > DOUBLE_CLICK_TIMEOUT_MS)
+    {
+        // On release or press, reset the repeat count.
+        ESP_LOGI(TAG, "Switch %d single-clicked", pin);
+        switchState.repeatCount = 0;
+    }
+
     switchState.state = state;
     switchState.lastChangeTimeMs = now_ms;
     if (state == DBNC_SWITCH_STATE_DOWN)
@@ -77,17 +107,48 @@ static void switch_pressed(gpio_num_t pin, dbnc_switch_state_t state /*, void *a
         switchState.lastPressTimeMs = now_ms;
     }
 
-    ESP_LOGI(TAG, "Switch %d %s", pin, isPressed ? "pressed" : "released");
+    if (switchState.repeatCount == 0)
+    {
+        // Single click
+        esp_zb_zcl_move_to_level_cmd_t cmd = {
+            .address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
+            .zcl_basic_cmd = {},
+            .level = isPressed ? 0xFF : 0x00,
+            .transition_time = 1,
+        };
+        cmd.zcl_basic_cmd.src_endpoint = SWITCH_ENDPOINT_ID;
+        uint8_t seq_num = esp_zb_zcl_level_move_to_level_with_onoff_cmd_req(&cmd);
+        ESP_EARLY_LOGI(TAG, "Move to level command sent (seq_num: %d)", seq_num);
+    }
+    else
+    {
+        // Double click
+        // Turn on!
+        esp_zb_zcl_move_to_level_cmd_t cmd = {
+            .address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
+            .zcl_basic_cmd = {},
+            .level = 0xFF,
+            .transition_time = 1,
+        };
+        cmd.zcl_basic_cmd.src_endpoint = SWITCH_ENDPOINT_ID;
+        uint8_t seq_num = esp_zb_zcl_level_move_to_level_with_onoff_cmd_req(&cmd);
+        ESP_EARLY_LOGI(TAG, "Move to level command sent (seq_num: %d)", seq_num);
 
-    esp_zb_zcl_move_to_level_cmd_t cmd = {
-        .address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
-        .zcl_basic_cmd = {},
-        .level = isPressed ? 0xFF : 0x00,
-        .transition_time = 1,
-    };
-    cmd.zcl_basic_cmd.src_endpoint = SWITCH_ENDPOINT_ID;
-    uint8_t seq_num = esp_zb_zcl_level_move_to_level_with_onoff_cmd_req(&cmd);
-    ESP_EARLY_LOGI(TAG, "Move to level command sent (seq_num: %d)", seq_num);
+        const uint8_t repeat = switchState.repeatCount;
+        const uint16_t color_x = color_x_table[repeat % 3];
+        const uint16_t color_y = color_y_table[repeat % 3];
+        esp_zb_zcl_color_move_to_color_cmd_t cmd2 = {
+            .address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
+            .zcl_basic_cmd = {},
+            .color_x = color_x,
+            .color_y = color_y,
+            .transition_time = 1,
+        };
+        cmd2.zcl_basic_cmd.src_endpoint = SWITCH_ENDPOINT_ID;
+        uint8_t seq_num2 = esp_zb_zcl_color_move_to_color_cmd_req(&cmd2);
+        ESP_EARLY_LOGI(TAG, "Move to color command sent (seq_num: %d; x: %x, y: %x)", seq_num2, color_x, color_y);
+    }
+
 }
 
 static void start_top_level_commissioning(uint8_t mode_mask)
