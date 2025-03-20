@@ -34,28 +34,48 @@ static const uint8_t SWITCH_GPIO_PIN = GPIO_NUM_9;
 // A completely random unused GPIO pin, which you can now attach a pull-up to.
 static const uint8_t ANOTHER_BUTTON_GPIO_PIN = GPIO_NUM_19;
 
+// Randomly-chosen endpoint ID.
+static const uint8_t SWITCH_ENDPOINT_ID = 1;
+
+// MS amount to throttle sending LED commands.
+static const int64_t LED_THROTTLE_MS = 1;
+
 static led_strip_handle_t led_strip = NULL;
-static bool isPressed = false;
 static bool isIdentifying = false;
 
-static const int64_t LED_THROTTLE_MS = 100;
-static int64_t lastPressedTimeMs = 0;
+typedef struct {
+    dbnc_switch_state_t state;
+    int64_t lastChangeTimeMs;
+    int64_t lastPressTimeMs;
+} switch_state_t;
+
+// TODO: scale to multiple switches.
+static switch_state_t switchState = {
+    .state = DBNC_SWITCH_STATE_UP,
+    .lastChangeTimeMs = 0,
+    .lastPressTimeMs = 0,
+};
 
 static void switch_pressed(gpio_num_t pin, dbnc_switch_state_t state /*, void *arg*/)
 {
-    isPressed = state == DBNC_SWITCH_STATE_DOWN;
+    const bool isPressed = (state == DBNC_SWITCH_STATE_DOWN);
+    const int64_t now_ms = esp_timer_get_time() / 1000; // Convert to milliseconds
 
     // Throttle the button *presses* to avoid overloading the Zigbee stack.
     // TODO: this still can crash; we should probably wait for the callback from
     // the controlled device.
-    int64_t pressTimeMicros = esp_timer_get_time();
-    int64_t pressTimeMs = pressTimeMicros / 1000; // Convert to milliseconds
-    if (isPressed && pressTimeMs - lastPressedTimeMs < LED_THROTTLE_MS)
+    if (isPressed && now_ms - switchState.lastChangeTimeMs < LED_THROTTLE_MS)
     {
         ESP_LOGI(TAG, "Switch %d pressed too fast; ignoring.", pin);
         return;
     }
-    lastPressedTimeMs = pressTimeMs;
+
+    switchState.state = state;
+    switchState.lastChangeTimeMs = now_ms;
+    if (state == DBNC_SWITCH_STATE_DOWN)
+    {
+        switchState.lastPressTimeMs = now_ms;
+    }
 
     ESP_LOGI(TAG, "Switch %d %s", pin, isPressed ? "pressed" : "released");
 
@@ -65,8 +85,7 @@ static void switch_pressed(gpio_num_t pin, dbnc_switch_state_t state /*, void *a
         .level = isPressed ? 0xFF : 0x00,
         .transition_time = 1,
     };
-    uint8_t endpoint_id = 1; // TODO: share
-    cmd.zcl_basic_cmd.src_endpoint = endpoint_id;
+    cmd.zcl_basic_cmd.src_endpoint = SWITCH_ENDPOINT_ID;
     uint8_t seq_num = esp_zb_zcl_level_move_to_level_with_onoff_cmd_req(&cmd);
     ESP_EARLY_LOGI(TAG, "Move to level command sent (seq_num: %d)", seq_num);
 }
@@ -270,8 +289,7 @@ static void zigbee_task(void* params)
             .identify_time = ESP_ZB_ZCL_IDENTIFY_IDENTIFY_TIME_DEFAULT_VALUE,
         },
     };
-    uint8_t endpoint_id = 1;
-    esp_zb_ep_list_t* dimm_switch_ep = esp_zb_color_dimmable_switch_ep_create(endpoint_id, &switch_cfg);
+    esp_zb_ep_list_t* dimm_switch_ep = esp_zb_color_dimmable_switch_ep_create(SWITCH_ENDPOINT_ID, &switch_cfg);
 
     // esp_zb_color_dimmable_light_cfg_t light_cfg = {
     //     .basic_cfg = {
@@ -327,10 +345,10 @@ static void zigbee_task(void* params)
         .manufacturer_name = "\x07" "citelao",
         .model_identifier = "\x07" "esp32c6",
     };
-    ESP_ERROR_CHECK(esp_zcl_utility_add_ep_basic_manufacturer_info(dimm_switch_ep, endpoint_id, &manufacturer_info));
+    ESP_ERROR_CHECK(esp_zcl_utility_add_ep_basic_manufacturer_info(dimm_switch_ep, SWITCH_ENDPOINT_ID, &manufacturer_info));
     ESP_ERROR_CHECK(esp_zb_device_register(dimm_switch_ep));
     esp_zb_core_action_handler_register(action_handler);
-    esp_zb_identify_notify_handler_register(endpoint_id, identify_cb);
+    esp_zb_identify_notify_handler_register(SWITCH_ENDPOINT_ID, identify_cb);
     ESP_ERROR_CHECK(esp_zb_set_primary_network_channel_set(ESP_ZB_TRANSCEIVER_ALL_CHANNELS_MASK));
 
     // Because we call with `false`, esp_zb_app_signal_handler will get a
@@ -419,6 +437,7 @@ void old_loop(void* params)
     int delta = -1;
     while (1)
     {
+        const bool isPressed = (switchState.state == DBNC_SWITCH_STATE_DOWN);
         if (isPressed)
         {
             brightness_idx = brightness_steps - 1;
