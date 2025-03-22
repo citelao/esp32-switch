@@ -44,6 +44,30 @@ See [Zigbee Cluster Library Specification](https://zigbeealliance.org/wp-content
 
 https://medium.com/@omaslyuchenko/hello-zigbee-part-22-identify-cluster-90cf12680306
 
+## How are XY colors represented?
+
+CIE 1931 xyY.
+
+> This cluster provides an interface for changing the color of a light. Color is specified according to the 
+Commission Internationale de l'Éclairage (CIE) specification CIE 1931 Color Space, [I1]. Color control is 
+carried out in terms of x,y values, as defined by this specification
+> [...]
+> The CurrentX attribute contains the current value of the normalized chromaticity value x, as defined in the 
+CIE xyY Color Space. It is updated as fast as practical during commands that change the color.
+>
+> The value of x SHALL be related to the CurrentX attribute by the relationship
+>
+> x = CurrentX / 65536 (CurrentX in the range 0 to 65279 inclusive)
+
+[ZCL Spec pg. 5-2, 5-5](https://zigbeealliance.org/wp-content/uploads/2019/12/07-5123-06-zigbee-cluster-library-specification.pdf)
+
+The xyY colorspace is a normalized version of the XYZ colorspace, which is based on the standard luminosity functions. Because xyY is normalized, `x + y + z = 1`, therefore `z = 1 - x - y`, therefore you can represent any color with just `x` and `y`. An additional `Y` represents the *brightness* of the color, corresponding to the original `Y` in XYZ (which happens to be basically identical to visible brightness).
+
+https://www.scratchapixel.com/lessons/digital-imaging/colors/color-space.html#:~:text=Once%20normalized%2C%20the%20values%20of%20the%20resulting%20x%20y%20and%20z%20components%20sum%20up%20to%201.%20Therefore%20we%20can%20find%20the%20value%20of%20any%20of%20the%20components%20if%20we%20know%20the%20values%20of%20the%20other%20two.
+
+https://github.com/Koenkk/zigbee2mqtt/issues/272
+https://easyrgb.com/en/math.php
+
 ---
 
 # SDK questions
@@ -86,3 +110,48 @@ Include `esp_check.h`.
 See also my `errors` component for missing macros.
 
 https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/esp_err.html
+
+## Do pull-ups/pull-downs need an external resistor?
+
+No, unless the trace is long enough that you worry antenna effects will induce
+larger current than the very, very tiny current that the internal resistors
+allow.
+
+https://archive.seattlerobotics.org/encoder/199703/basics.html
+https://electronics.stackexchange.com/questions/270833/considerations-when-using-internal-pull-up-down-resistors
+https://electronics.stackexchange.com/a/20746/296425
+
+I had an interesting outcome where I'd wired up the buttons using external
+resistors---I had set the input pins to be pull-DOWN, but they still behaved as
+pull-UP (e.g. high when switch open, low when switch closed). 
+
+I have 2/2 switches, and I got the pinouts wrong. I thought it was:
+
+   -+        +-
+    | switch |
+   -+        +-
+
+But it was:
+
+   -----+------
+      switch
+   -----+------
+
+So I accidentally wired this:
+
+   +3.3V (or Vcc)
+      |
+      Resistor (~200R)
+      |
+      LED
+      |
+      +------- IC Input Pin
+      |
+   [Switch]
+      |
+    Ground
+
+Which is *explicitly* a pull-UP wiring. And since the external resistor was MUCH
+weaker than the internal resistor, enough current flowed to completely replace
+whatever the internal resistor set.
+
