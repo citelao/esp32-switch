@@ -30,10 +30,15 @@ static const uint8_t LED_GPIO_PIN = 8;
 
 // BOOT button, via switch_driver.h
 // Everyone says is GPIO0, but it's GPIO9.
-static const uint8_t SWITCH_GPIO_PIN = GPIO_NUM_9;
+static const uint8_t BOOT_SWITCH_GPIO_PIN = GPIO_NUM_9;
 
 // A completely random unused GPIO pin, which you can now attach a pull-up to.
-static const uint8_t ANOTHER_BUTTON_GPIO_PIN = GPIO_NUM_19;
+// static const uint8_t ANOTHER_BUTTON_GPIO_PIN = GPIO_NUM_19;
+// https://docs.espressif.com/projects/esp-idf/en/v5.4/esp32/api-reference/peripherals/gpio.html
+static const uint8_t TOP_BUTTON_GPIO_PIN = GPIO_NUM_19;
+static const uint8_t MID_TOP_BUTTON_GPIO_PIN = GPIO_NUM_21;
+static const uint8_t MID_BOT_BUTTON_GPIO_PIN = GPIO_NUM_22;
+static const uint8_t BOTTOM_BUTTON_GPIO_PIN = GPIO_NUM_23;
 
 // Randomly-chosen endpoint ID.
 static const uint8_t SWITCH_ENDPOINT_ID = 1;
@@ -444,6 +449,9 @@ static const double brightness_ramp[58] = {
 };
 
 // Enable a pullup switch.
+//
+// Connect the switch directly to ground (or add a separate external pull-up if
+// you're worried about induced currents from long traces).
 void enable_gpio_switch(gpio_num_t gpio_num)
 {
     gpio_config_t io_conf = {
@@ -453,6 +461,8 @@ void enable_gpio_switch(gpio_num_t gpio_num)
 
         // Interestingly, I had pull-DOWN enabled in previous iterations; the
         // BOOT button (GPIO09) still behaves as a pull-UP.
+        //
+        // https://docs.espressif.com/projects/esptool/en/latest/esp32/advanced-topics/boot-mode-selection.html?highlight=GPIO0
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
 
         .pull_up_en = GPIO_PULLUP_ENABLE,
@@ -465,15 +475,21 @@ void old_loop(void* params)
 {
     // Configure the BOOT button as input
     // https://github.com/espressif/esp-zigbee-sdk/blob/main/examples/common/switch_driver/src/switch_driver.c
-    enable_gpio_switch(SWITCH_GPIO_PIN);
+    enable_gpio_switch(BOOT_SWITCH_GPIO_PIN);
 
-    enable_gpio_switch(ANOTHER_BUTTON_GPIO_PIN);
+    enable_gpio_switch(TOP_BUTTON_GPIO_PIN);
+    enable_gpio_switch(MID_TOP_BUTTON_GPIO_PIN);
+    enable_gpio_switch(MID_BOT_BUTTON_GPIO_PIN);
+    enable_gpio_switch(BOTTOM_BUTTON_GPIO_PIN);
 
     ESP_ERROR_CHECK(gpio_install_isr_service(ESP_INTR_FLAG_LEVEL1));
 
     ESP_ERROR_CHECK(dbnc_init(switch_pressed));
-    ESP_ERROR_CHECK(dbnc_register_switch(SWITCH_GPIO_PIN));
-    ESP_ERROR_CHECK(dbnc_register_switch(ANOTHER_BUTTON_GPIO_PIN));
+    ESP_ERROR_CHECK(dbnc_register_switch(BOOT_SWITCH_GPIO_PIN));
+    ESP_ERROR_CHECK(dbnc_register_switch(TOP_BUTTON_GPIO_PIN));
+    ESP_ERROR_CHECK(dbnc_register_switch(MID_TOP_BUTTON_GPIO_PIN));
+    ESP_ERROR_CHECK(dbnc_register_switch(MID_BOT_BUTTON_GPIO_PIN));
+    ESP_ERROR_CHECK(dbnc_register_switch(BOTTOM_BUTTON_GPIO_PIN));
 
     // https://components.espressif.com/components/espressif/led_strip
     led_strip_config_t strip_config = {
