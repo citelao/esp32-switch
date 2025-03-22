@@ -73,8 +73,8 @@ static uint16_t color_y_table[3] = {
 
 static void switch_pressed(gpio_num_t pin, dbnc_switch_state_t state /*, void *arg*/)
 {
-    // Pull-down, so HIGH means pressed.
-    const bool isPressed = (state == DBNC_SWITCH_STATE_HIGH);
+    // Pull-up, so LOW means pressed.
+    const bool isPressed = (state == DBNC_SWITCH_STATE_LOW);
     const int64_t now_ms = esp_timer_get_time() / 1000; // Convert to milliseconds
 
     // Throttle the button *presses* to avoid overloading the Zigbee stack.
@@ -443,14 +443,19 @@ static const double brightness_ramp[58] = {
     0.982456, 1.000000
 };
 
+// Enable a pullup switch.
 void enable_gpio_switch(gpio_num_t gpio_num)
 {
     gpio_config_t io_conf = {
         .intr_type = GPIO_INTR_ANYEDGE,
         .mode = GPIO_MODE_INPUT,
         .pin_bit_mask = (1ULL << gpio_num),
-        .pull_down_en = GPIO_PULLDOWN_ENABLE,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
+
+        // Interestingly, I had pull-DOWN enabled in previous iterations; the
+        // BOOT button (GPIO09) still behaves as a pull-UP.
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+
+        .pull_up_en = GPIO_PULLUP_ENABLE,
     };
     ESP_ERROR_CHECK(gpio_config(&io_conf));
     ESP_LOGI(TAG, "Configuring switch on GPIO %d", gpio_num);
