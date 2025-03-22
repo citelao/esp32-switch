@@ -56,7 +56,7 @@ typedef struct {
 
 // TODO: scale to multiple switches.
 static switch_state_t switchState = {
-    .state = DBNC_SWITCH_STATE_UP,
+    .state = DBNC_SWITCH_STATE_HIGH,
     .lastChangeTimeMs = 0,
     .lastPressTimeMs = 0,
     .repeatCount = 0,
@@ -73,7 +73,8 @@ static uint16_t color_y_table[3] = {
 
 static void switch_pressed(gpio_num_t pin, dbnc_switch_state_t state /*, void *arg*/)
 {
-    const bool isPressed = (state == DBNC_SWITCH_STATE_DOWN);
+    // Pull-down, so HIGH means pressed.
+    const bool isPressed = (state == DBNC_SWITCH_STATE_HIGH);
     const int64_t now_ms = esp_timer_get_time() / 1000; // Convert to milliseconds
 
     // Throttle the button *presses* to avoid overloading the Zigbee stack.
@@ -102,7 +103,7 @@ static void switch_pressed(gpio_num_t pin, dbnc_switch_state_t state /*, void *a
 
     switchState.state = state;
     switchState.lastChangeTimeMs = now_ms;
-    if (state == DBNC_SWITCH_STATE_DOWN)
+    if (isPressed)
     {
         switchState.lastPressTimeMs = now_ms;
     }
@@ -497,7 +498,7 @@ void old_loop(void* params)
     int delta = -1;
     while (1)
     {
-        const bool isPressed = (switchState.state == DBNC_SWITCH_STATE_DOWN);
+        const bool isPressed = (switchState.state == DBNC_SWITCH_STATE_LOW);
         if (isPressed)
         {
             brightness_idx = brightness_steps - 1;

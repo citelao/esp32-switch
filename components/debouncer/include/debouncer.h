@@ -7,8 +7,8 @@ extern "C" {
 
 typedef enum
 {
-    DBNC_SWITCH_STATE_DOWN,
-    DBNC_SWITCH_STATE_UP,
+    DBNC_SWITCH_STATE_LOW,
+    DBNC_SWITCH_STATE_HIGH,
 } dbnc_switch_state_t;
 
 // Handler for GPIO debouncer events

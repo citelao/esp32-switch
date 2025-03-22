@@ -21,6 +21,11 @@ static const char* TAG = "CL_DEBOUNCE";
 static QueueHandle_t s_queue = NULL;
 static dbnc_handler_t s_handler = NULL;
 
+static dbnc_switch_state_t level_to_state(int level)
+{
+    return (level != 0) ? DBNC_SWITCH_STATE_HIGH : DBNC_SWITCH_STATE_LOW;
+}
+
 static void dbnc_task(void *arg)
 {
     while (1)
@@ -30,11 +35,11 @@ static void dbnc_task(void *arg)
         ABORT_IF_FALSE(xQueueReceive(s_queue, &pin, portMAX_DELAY), ESP_ERR_INVALID_STATE, TAG, "Failed to receive from queue");
 
         // Handle the event
-        ESP_LOGI(TAG, "Switch pressed on GPIO %d", pin);
+        const int level = gpio_get_level(pin);
+        ESP_LOGI(TAG, "Switch state changed on GPIO %d (to %d)", pin, level);
         ESP_ERROR_CHECK(gpio_intr_disable(pin));
 
-        const bool isPressed = !gpio_get_level(pin);
-        const dbnc_switch_state_t state = isPressed ? DBNC_SWITCH_STATE_DOWN : DBNC_SWITCH_STATE_UP;
+        const dbnc_switch_state_t state = level_to_state(level);
 
         // Fire the handler as soon as we get the event.
         s_handler(pin, state);
@@ -42,14 +47,14 @@ static void dbnc_task(void *arg)
         vTaskDelay(pdMS_TO_TICKS(DBNC_DEBOUNCE_DELAY_MS));
 
         // Check to see if the switch is still pressed after the delay.
-        const bool isPressedAfterDelay = !gpio_get_level(pin);
-        if (isPressed != isPressedAfterDelay)
+        const bool levelAfterDelay = gpio_get_level(pin);
+        if (level != levelAfterDelay)
         {
             // The switch state has changed, so we need to handle it again.
-            s_handler(pin, isPressedAfterDelay ? DBNC_SWITCH_STATE_DOWN : DBNC_SWITCH_STATE_UP);
+            s_handler(pin, level_to_state(levelAfterDelay));
         }
 
-        // ESP_LOGI(TAG, "Switch GPIO %d is %s, %s after delay", pin, isPressed ? "pressed" : "released", isPressedAfterDelay ? "pressed" : "released");
+        // ESP_LOGI(TAG, "Switch GPIO %d is %s, %s after delay", pin, level ? "pressed" : "released", levelAfterDelay ? "pressed" : "released");
         ESP_ERROR_CHECK(gpio_intr_enable(pin));
     }
 }
