@@ -148,7 +148,6 @@ static void switch_pressed(gpio_num_t pin, dbnc_switch_state_t state /*, void *a
         uint8_t seq_num2 = esp_zb_zcl_color_move_to_color_cmd_req(&cmd2);
         ESP_EARLY_LOGI(TAG, "Move to color command sent (seq_num: %d; x: %x, y: %x)", seq_num2, color_x, color_y);
     }
-
 }
 
 static void start_top_level_commissioning(uint8_t mode_mask)
