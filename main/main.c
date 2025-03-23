@@ -59,13 +59,52 @@ typedef struct {
     int repeatCount;
 } switch_state_t;
 
-// TODO: scale to multiple switches.
-static switch_state_t switchState = {
-    .state = DBNC_SWITCH_STATE_HIGH,
-    .lastChangeTimeMs = 0,
-    .lastPressTimeMs = 0,
-    .repeatCount = 0,
+// Rust, please save me
+#define SWITCH_COUNT 4
+static switch_state_t switch_states[SWITCH_COUNT] = {
+    {
+        .state = DBNC_SWITCH_STATE_HIGH,
+        .lastChangeTimeMs = 0,
+        .lastPressTimeMs = 0,
+        .repeatCount = 0,
+    },
+    {
+        .state = DBNC_SWITCH_STATE_HIGH,
+        .lastChangeTimeMs = 0,
+        .lastPressTimeMs = 0,
+        .repeatCount = 0,
+    },
+    {
+        .state = DBNC_SWITCH_STATE_HIGH,
+        .lastChangeTimeMs = 0,
+        .lastPressTimeMs = 0,
+        .repeatCount = 0,
+    },
+    {
+        .state = DBNC_SWITCH_STATE_HIGH,
+        .lastChangeTimeMs = 0,
+        .lastPressTimeMs = 0,
+        .repeatCount = 0,
+    },
 };
+
+static size_t get_switch_index(gpio_num_t pin)
+{
+    switch (pin)
+    {
+    case TOP_BUTTON_GPIO_PIN:
+        return 0;
+    case MID_TOP_BUTTON_GPIO_PIN:
+        return 1;
+    case MID_BOT_BUTTON_GPIO_PIN:
+        return 2;
+    case BOTTOM_BUTTON_GPIO_PIN:
+        return 3;
+    default:
+        ESP_LOGE(TAG, "Invalid GPIO pin: %d", pin);
+        abort();
+    }
+}
 
 // Colors!
 // https://github.com/espressif/esp-zigbee-sdk/blob/dba7ed8ef29bb2d53b622e233963a6d0f9628fea/examples/esp_zigbee_HA_sample/HA_color_dimmable_switch/main/esp_zb_switch.c
@@ -76,44 +115,27 @@ static uint16_t color_y_table[3] = {
     21626, 38321, 3932
 };
 
-static void switch_pressed(gpio_num_t pin, dbnc_switch_state_t state /*, void *arg*/)
+static void on_top_state_changed()
 {
-    // Pull-up, so LOW means pressed.
-    const bool isPressed = (state == DBNC_SWITCH_STATE_LOW);
-    const int64_t now_ms = esp_timer_get_time() / 1000; // Convert to milliseconds
+    ESP_LOGI(TAG, "Top button pressed; turning on");
+    esp_zb_zcl_move_to_level_cmd_t cmd = {
+        .address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
+        .zcl_basic_cmd = {},
+        .level = 0xFF,
+        .transition_time = 1,
+    };
+    cmd.zcl_basic_cmd.src_endpoint = SWITCH_ENDPOINT_ID;
+    uint8_t seq_num = esp_zb_zcl_level_move_to_level_with_onoff_cmd_req(&cmd);
+    ESP_LOGI(TAG, "Move to level command sent (seq_num: %d)", seq_num);
+}
 
-    // Throttle the button *presses* to avoid overloading the Zigbee stack.
-    // TODO: this still can crash; we should probably wait for the callback from
-    // the controlled device.
-    if (isPressed && now_ms - switchState.lastChangeTimeMs < LED_THROTTLE_MS)
-    {
-        ESP_LOGI(TAG, "Switch %d pressed too fast; ignoring.", pin);
-        return;
-    }
+static void on_mid_top_state_changed()
+{
+    ESP_LOGI(TAG, "Middle top button pressed; old behavior");
+    switch_state_t* switchState = &switch_states[get_switch_index(MID_TOP_BUTTON_GPIO_PIN)];
+    const bool isPressed = (switchState->state == DBNC_SWITCH_STATE_LOW);
 
-    ESP_LOGI(TAG, "Switch %d %s", pin, isPressed ? "pressed" : "released");
-
-    // Detect double-clicks.
-    if (isPressed && now_ms - switchState.lastPressTimeMs < DOUBLE_CLICK_TIMEOUT_MS)
-    {
-        switchState.repeatCount++;
-        ESP_LOGI(TAG, "Switch %d double-clicked (%d)", pin, switchState.repeatCount);
-    }
-    else if (now_ms - switchState.lastChangeTimeMs > DOUBLE_CLICK_TIMEOUT_MS)
-    {
-        // On release or press, reset the repeat count.
-        ESP_LOGI(TAG, "Switch %d single-clicked", pin);
-        switchState.repeatCount = 0;
-    }
-
-    switchState.state = state;
-    switchState.lastChangeTimeMs = now_ms;
-    if (isPressed)
-    {
-        switchState.lastPressTimeMs = now_ms;
-    }
-
-    if (switchState.repeatCount == 0)
+    if (switchState->repeatCount == 0)
     {
         // Single click
         esp_zb_zcl_move_to_level_cmd_t cmd = {
@@ -124,7 +146,7 @@ static void switch_pressed(gpio_num_t pin, dbnc_switch_state_t state /*, void *a
         };
         cmd.zcl_basic_cmd.src_endpoint = SWITCH_ENDPOINT_ID;
         uint8_t seq_num = esp_zb_zcl_level_move_to_level_with_onoff_cmd_req(&cmd);
-        ESP_EARLY_LOGI(TAG, "Move to level command sent (seq_num: %d)", seq_num);
+        ESP_LOGI(TAG, "Move to level command sent (seq_num: %d)", seq_num);
     }
     else
     {
@@ -138,9 +160,9 @@ static void switch_pressed(gpio_num_t pin, dbnc_switch_state_t state /*, void *a
         };
         cmd.zcl_basic_cmd.src_endpoint = SWITCH_ENDPOINT_ID;
         uint8_t seq_num = esp_zb_zcl_level_move_to_level_with_onoff_cmd_req(&cmd);
-        ESP_EARLY_LOGI(TAG, "Move to level command sent (seq_num: %d)", seq_num);
+        ESP_LOGI(TAG, "Move to level command sent (seq_num: %d)", seq_num);
 
-        const uint8_t repeat = switchState.repeatCount;
+        const uint8_t repeat = switchState->repeatCount;
         const uint16_t color_x = color_x_table[repeat % 3];
         const uint16_t color_y = color_y_table[repeat % 3];
         esp_zb_zcl_color_move_to_color_cmd_t cmd2 = {
@@ -152,7 +174,81 @@ static void switch_pressed(gpio_num_t pin, dbnc_switch_state_t state /*, void *a
         };
         cmd2.zcl_basic_cmd.src_endpoint = SWITCH_ENDPOINT_ID;
         uint8_t seq_num2 = esp_zb_zcl_color_move_to_color_cmd_req(&cmd2);
-        ESP_EARLY_LOGI(TAG, "Move to color command sent (seq_num: %d; x: %x, y: %x)", seq_num2, color_x, color_y);
+        ESP_LOGI(TAG, "Move to color command sent (seq_num: %d; x: %x, y: %x)", seq_num2, color_x, color_y);
+    }
+}
+
+static void on_bottom_state_changed()
+{
+    ESP_LOGI(TAG, "Bottom button pressed; turning off");
+    esp_zb_zcl_move_to_level_cmd_t cmd = {
+        .address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
+        .zcl_basic_cmd = {},
+        .level = 0x00,
+        .transition_time = 1,
+    };
+    cmd.zcl_basic_cmd.src_endpoint = SWITCH_ENDPOINT_ID;
+    uint8_t seq_num = esp_zb_zcl_level_move_to_level_with_onoff_cmd_req(&cmd);
+    ESP_LOGI(TAG, "Move to level command sent (seq_num: %d)", seq_num);
+}
+
+static void on_switch_state_changed(gpio_num_t pin, dbnc_switch_state_t state /*, void *arg*/)
+{
+    // Pull-up, so LOW means pressed.
+    const bool isPressed = (state == DBNC_SWITCH_STATE_LOW);
+    const int64_t now_ms = esp_timer_get_time() / 1000; // Convert to milliseconds
+
+    switch_state_t* switchState = &switch_states[get_switch_index(pin)];
+
+    // Throttle the button *presses* to avoid overloading the Zigbee stack.
+    // TODO: this still can crash; we should probably wait for the callback from
+    // the controlled device.
+    if (isPressed && now_ms - switchState->lastChangeTimeMs < LED_THROTTLE_MS)
+    {
+        ESP_LOGI(TAG, "Switch %d pressed too fast; ignoring.", pin);
+        return;
+    }
+
+    ESP_LOGI(TAG, "Switch %d %s", pin, isPressed ? "pressed" : "released");
+
+    // Detect double-clicks.
+    if (isPressed && now_ms - switchState->lastPressTimeMs < DOUBLE_CLICK_TIMEOUT_MS)
+    {
+        switchState->repeatCount++;
+        ESP_LOGI(TAG, "Switch %d double-clicked (%d)", pin, switchState->repeatCount);
+    }
+    else if (now_ms - switchState->lastChangeTimeMs > DOUBLE_CLICK_TIMEOUT_MS)
+    {
+        // On release or press, reset the repeat count.
+        ESP_LOGI(TAG, "Switch %d single-clicked", pin);
+        switchState->repeatCount = 0;
+    }
+
+    switchState->state = state;
+    switchState->lastChangeTimeMs = now_ms;
+    if (isPressed)
+    {
+        switchState->lastPressTimeMs = now_ms;
+    }
+
+    switch(pin)
+    {
+    case TOP_BUTTON_GPIO_PIN:
+        on_top_state_changed();
+        break;
+    case MID_TOP_BUTTON_GPIO_PIN:
+        on_mid_top_state_changed();
+        break;
+    case MID_BOT_BUTTON_GPIO_PIN:
+        ESP_LOGI(TAG, "Middle bottom button pressed");
+        on_mid_top_state_changed(); // TODO
+        break;
+    case BOTTOM_BUTTON_GPIO_PIN:
+        on_bottom_state_changed();
+        break;
+    default:
+        ESP_LOGE(TAG, "Invalid GPIO pin: %d", pin);
+        break;
     }
 }
 
@@ -484,7 +580,7 @@ void old_loop(void* params)
 
     ESP_ERROR_CHECK(gpio_install_isr_service(ESP_INTR_FLAG_LEVEL1));
 
-    ESP_ERROR_CHECK(dbnc_init(switch_pressed));
+    ESP_ERROR_CHECK(dbnc_init(on_switch_state_changed));
     ESP_ERROR_CHECK(dbnc_register_switch(BOOT_SWITCH_GPIO_PIN));
     ESP_ERROR_CHECK(dbnc_register_switch(TOP_BUTTON_GPIO_PIN));
     ESP_ERROR_CHECK(dbnc_register_switch(MID_TOP_BUTTON_GPIO_PIN));
@@ -519,7 +615,10 @@ void old_loop(void* params)
     int delta = -1;
     while (1)
     {
-        const bool isPressed = (switchState.state == DBNC_SWITCH_STATE_LOW);
+        const bool isPressed = (switch_states[0].state == DBNC_SWITCH_STATE_LOW) ||
+                               (switch_states[1].state == DBNC_SWITCH_STATE_LOW) ||
+                               (switch_states[2].state == DBNC_SWITCH_STATE_LOW) ||
+                               (switch_states[3].state == DBNC_SWITCH_STATE_LOW);
         if (isPressed)
         {
             brightness_idx = brightness_steps - 1;
