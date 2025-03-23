@@ -16,7 +16,13 @@
         "esp_zigbee_core.h": "c",
         "nvs_flash.h": "c",
         "esp_zigbee_trace.h": "c",
-        "*.tcc": "c"
+        "*.tcc": "c",
+        "esp_timer.h": "c",
+        "inttypes.h": "c",
+        "esp_zigbee_ha_standard.h": "c",
+        "esp_zigbee_zcl_basic.h": "c",
+        "zb_zcl_basic.h": "c",
+        "zb_zcl_color_control.h": "c"
     },
     "idf.flashType": "UART"
 }
