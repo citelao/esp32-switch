@@ -51,6 +51,7 @@ static const int64_t DOUBLE_CLICK_TIMEOUT_MS = 500;
 
 static led_strip_handle_t led_strip = NULL;
 static bool isIdentifying = false;
+static bool isBrightening = false;
 
 typedef struct {
     dbnc_switch_state_t state;
@@ -119,8 +120,18 @@ static void on_top_state_changed(switch_state_t* newState)
 {
     if (newState->state == DBNC_SWITCH_STATE_HIGH)
     {
-        ESP_LOGI(TAG, "Top button released");
-        return;
+        ESP_LOGI(TAG, "Top button released; stopping brightening if needed (b: %d)", isBrightening);
+        if (isBrightening)
+        {
+            esp_zb_zcl_level_stop_cmd_t cmd = {
+                .address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
+                .zcl_basic_cmd = {},
+            };
+            cmd.zcl_basic_cmd.src_endpoint = SWITCH_ENDPOINT_ID;
+            uint8_t seq_num = esp_zb_zcl_level_stop_cmd_req(&cmd);
+            ESP_LOGI(TAG, "Stop command sent (seq_num: %d)", seq_num);
+            isBrightening = false;
+        }
     }
     else
     {
@@ -641,6 +652,7 @@ void old_loop(void* params)
     int delta = -1;
     while (1)
     {
+        // Handle the onboard LED.
         const bool isPressed = (switch_states[0].state == DBNC_SWITCH_STATE_LOW) ||
                                (switch_states[1].state == DBNC_SWITCH_STATE_LOW) ||
                                (switch_states[2].state == DBNC_SWITCH_STATE_LOW) ||
@@ -667,6 +679,28 @@ void old_loop(void* params)
         const double brightness = brightness_ramp[brightness_idx];
         ESP_ERROR_CHECK(led_strip_set_pixel(led_strip, 0, color_to_use.r * brightness, color_to_use.g * brightness, color_to_use.b * brightness));
         ESP_ERROR_CHECK(led_strip_refresh(led_strip));
+
+        // Handle held buttons.
+        const bool isTopPressed = (switch_states[0].state == DBNC_SWITCH_STATE_LOW);
+        const int64_t now_ms = esp_timer_get_time() / 1000; // Convert to milliseconds
+        if (!isBrightening && isTopPressed && (now_ms - switch_states[0].lastPressTimeMs > 1000))
+        {
+            // Begin continuous movement; ZCL spec 3-64.
+            // Only run this once.
+            ESP_LOGI(TAG, "Top button held; sending level move command");
+            esp_zb_zcl_level_move_cmd_t cmd = {
+                .address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
+                .zcl_basic_cmd = {},
+                .move_mode = ESP_ZB_ZCL_CMD_COLOR_CONTROL_MOVE_UP,
+
+                // 10 units per second
+                .rate = 0x10,
+            };
+            cmd.zcl_basic_cmd.src_endpoint = SWITCH_ENDPOINT_ID;
+            uint8_t seq_num = esp_zb_zcl_level_move_cmd_req(&cmd);
+            isBrightening = true;
+        }
+
         vTaskDelay(50 / portTICK_PERIOD_MS);
     }
 }
