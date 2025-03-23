@@ -13,7 +13,7 @@
 static const int DBNC_STORED_EVENTS = 10;
 
 // Time to wait for a keypress (MS)
-static const int DBNC_DEBOUNCE_DELAY_MS = 50;
+static const int DBNC_DEBOUNCE_DELAY_MS = 200;
 
 // Tag for logging
 static const char* TAG = "CL_DEBOUNCE";
@@ -47,6 +47,9 @@ static void dbnc_task(void *arg)
         vTaskDelay(pdMS_TO_TICKS(DBNC_DEBOUNCE_DELAY_MS));
 
         // Check to see if the switch is still pressed after the delay.
+        //
+        // TODO: it's not handling release of very bounce switches well. I think
+        // we have to rerun this delay if we detect a change.
         const bool levelAfterDelay = gpio_get_level(pin);
         if (level != levelAfterDelay)
         {
