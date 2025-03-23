@@ -115,18 +115,35 @@ static uint16_t color_y_table[3] = {
     21626, 38321, 3932
 };
 
-static void on_top_state_changed()
+static void on_top_state_changed(switch_state_t* newState)
 {
-    ESP_LOGI(TAG, "Top button pressed; turning on");
-    esp_zb_zcl_move_to_level_cmd_t cmd = {
-        .address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
-        .zcl_basic_cmd = {},
-        .level = 0xFF,
-        .transition_time = 1,
-    };
-    cmd.zcl_basic_cmd.src_endpoint = SWITCH_ENDPOINT_ID;
-    uint8_t seq_num = esp_zb_zcl_level_move_to_level_with_onoff_cmd_req(&cmd);
-    ESP_LOGI(TAG, "Move to level command sent (seq_num: %d)", seq_num);
+    if (newState->state == DBNC_SWITCH_STATE_HIGH)
+    {
+        ESP_LOGI(TAG, "Top button released");
+        return;
+    }
+    else
+    {
+        ESP_LOGI(TAG, "Top button pressed; turning on");
+        // esp_zb_zcl_move_to_level_cmd_t cmd = {
+        //     .address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
+        //     .zcl_basic_cmd = {},
+        //     .level = 0xFF,
+        //     .transition_time = 1,
+        // };
+        // cmd.zcl_basic_cmd.src_endpoint = SWITCH_ENDPOINT_ID;
+        // uint8_t seq_num = esp_zb_zcl_level_move_to_level_with_onoff_cmd_req(&cmd);
+        // ESP_LOGI(TAG, "Move to level command sent (seq_num: %d)", seq_num);
+
+        esp_zb_zcl_on_off_cmd_t cmd = {
+            .address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
+            .zcl_basic_cmd = {},
+            .on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_ON_ID,
+        };
+        cmd.zcl_basic_cmd.src_endpoint = SWITCH_ENDPOINT_ID;
+        uint8_t seq_num = esp_zb_zcl_on_off_cmd_req(&cmd);
+        ESP_LOGI(TAG, "On command sent (seq_num: %d)", seq_num);
+    }
 }
 
 static void on_mid_top_state_changed()
@@ -181,15 +198,24 @@ static void on_mid_top_state_changed()
 static void on_bottom_state_changed()
 {
     ESP_LOGI(TAG, "Bottom button pressed; turning off");
-    esp_zb_zcl_move_to_level_cmd_t cmd = {
+//     esp_zb_zcl_move_to_level_cmd_t cmd = {
+//         .address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
+//         .zcl_basic_cmd = {},
+//         .level = 0x00,
+//         .transition_time = 1,
+//     };
+//     cmd.zcl_basic_cmd.src_endpoint = SWITCH_ENDPOINT_ID;
+//     uint8_t seq_num = esp_zb_zcl_level_move_to_level_with_onoff_cmd_req(&cmd);
+//     ESP_LOGI(TAG, "Move to level command sent (seq_num: %d)", seq_num);
+
+    esp_zb_zcl_on_off_cmd_t cmd = {
         .address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
         .zcl_basic_cmd = {},
-        .level = 0x00,
-        .transition_time = 1,
+        .on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID,
     };
     cmd.zcl_basic_cmd.src_endpoint = SWITCH_ENDPOINT_ID;
-    uint8_t seq_num = esp_zb_zcl_level_move_to_level_with_onoff_cmd_req(&cmd);
-    ESP_LOGI(TAG, "Move to level command sent (seq_num: %d)", seq_num);
+    uint8_t seq_num = esp_zb_zcl_on_off_cmd_req(&cmd);
+    ESP_LOGI(TAG, "On command sent (seq_num: %d)", seq_num);
 }
 
 static void on_switch_state_changed(gpio_num_t pin, dbnc_switch_state_t state /*, void *arg*/)
@@ -234,7 +260,7 @@ static void on_switch_state_changed(gpio_num_t pin, dbnc_switch_state_t state /*
     switch(pin)
     {
     case TOP_BUTTON_GPIO_PIN:
-        on_top_state_changed();
+        on_top_state_changed(switchState);
         break;
     case MID_TOP_BUTTON_GPIO_PIN:
         on_mid_top_state_changed();
