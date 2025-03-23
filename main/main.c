@@ -206,27 +206,45 @@ static void on_mid_top_state_changed()
     }
 }
 
-static void on_bottom_state_changed()
+static void on_bottom_state_changed(switch_state_t* newState)
 {
-    ESP_LOGI(TAG, "Bottom button pressed; turning off");
-//     esp_zb_zcl_move_to_level_cmd_t cmd = {
-//         .address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
-//         .zcl_basic_cmd = {},
-//         .level = 0x00,
-//         .transition_time = 1,
-//     };
-//     cmd.zcl_basic_cmd.src_endpoint = SWITCH_ENDPOINT_ID;
-//     uint8_t seq_num = esp_zb_zcl_level_move_to_level_with_onoff_cmd_req(&cmd);
-//     ESP_LOGI(TAG, "Move to level command sent (seq_num: %d)", seq_num);
-
-    esp_zb_zcl_on_off_cmd_t cmd = {
-        .address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
-        .zcl_basic_cmd = {},
-        .on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID,
-    };
-    cmd.zcl_basic_cmd.src_endpoint = SWITCH_ENDPOINT_ID;
-    uint8_t seq_num = esp_zb_zcl_on_off_cmd_req(&cmd);
-    ESP_LOGI(TAG, "On command sent (seq_num: %d)", seq_num);
+    if (newState->state == DBNC_SWITCH_STATE_HIGH)
+    {
+        ESP_LOGI(TAG, "Bottom button released; stopping brightening if needed (b: %d)", isBrightening);
+        if (isBrightening)
+        {
+            esp_zb_zcl_level_stop_cmd_t cmd = {
+                .address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
+                .zcl_basic_cmd = {},
+            };
+            cmd.zcl_basic_cmd.src_endpoint = SWITCH_ENDPOINT_ID;
+            uint8_t seq_num = esp_zb_zcl_level_stop_cmd_req(&cmd);
+            ESP_LOGI(TAG, "Stop command sent (seq_num: %d)", seq_num);
+            isBrightening = false;
+        }
+    }
+    else
+    {
+        ESP_LOGI(TAG, "Bottom button pressed; turning off");
+    //     esp_zb_zcl_move_to_level_cmd_t cmd = {
+    //         .address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
+    //         .zcl_basic_cmd = {},
+    //         .level = 0x00,
+    //         .transition_time = 1,
+    //     };
+    //     cmd.zcl_basic_cmd.src_endpoint = SWITCH_ENDPOINT_ID;
+    //     uint8_t seq_num = esp_zb_zcl_level_move_to_level_with_onoff_cmd_req(&cmd);
+    //     ESP_LOGI(TAG, "Move to level command sent (seq_num: %d)", seq_num);
+    
+        esp_zb_zcl_on_off_cmd_t cmd = {
+            .address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
+            .zcl_basic_cmd = {},
+            .on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID,
+        };
+        cmd.zcl_basic_cmd.src_endpoint = SWITCH_ENDPOINT_ID;
+        uint8_t seq_num = esp_zb_zcl_on_off_cmd_req(&cmd);
+        ESP_LOGI(TAG, "On command sent (seq_num: %d)", seq_num);
+    }
 }
 
 static void on_switch_state_changed(gpio_num_t pin, dbnc_switch_state_t state /*, void *arg*/)
@@ -281,7 +299,7 @@ static void on_switch_state_changed(gpio_num_t pin, dbnc_switch_state_t state /*
         on_mid_top_state_changed(); // TODO
         break;
     case BOTTOM_BUTTON_GPIO_PIN:
-        on_bottom_state_changed();
+        on_bottom_state_changed(switchState);
         break;
     default:
         ESP_LOGE(TAG, "Invalid GPIO pin: %d", pin);
@@ -682,23 +700,34 @@ void old_loop(void* params)
 
         // Handle held buttons.
         const bool isTopPressed = (switch_states[0].state == DBNC_SWITCH_STATE_LOW);
+        const bool isBottomPressed = (switch_states[3].state == DBNC_SWITCH_STATE_LOW);
         const int64_t now_ms = esp_timer_get_time() / 1000; // Convert to milliseconds
-        if (!isBrightening && isTopPressed && (now_ms - switch_states[0].lastPressTimeMs > 1000))
+        if (!isBrightening)
         {
-            // Begin continuous movement; ZCL spec 3-64.
-            // Only run this once.
-            ESP_LOGI(TAG, "Top button held; sending level move command");
-            esp_zb_zcl_level_move_cmd_t cmd = {
-                .address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
-                .zcl_basic_cmd = {},
-                .move_mode = ESP_ZB_ZCL_CMD_COLOR_CONTROL_MOVE_UP,
+            const bool hasTopBeenHeld = (isTopPressed && (now_ms - switch_states[0].lastPressTimeMs > 1000));
+            const bool hasBottomBeenHeld = (isBottomPressed && (now_ms - switch_states[3].lastPressTimeMs > 1000));
+            if (hasTopBeenHeld || hasBottomBeenHeld)
+            {
+                // Wrong command:
+                // .move_mode = ESP_ZB_ZCL_CMD_COLOR_CONTROL_MOVE_UP,
+                // 0x00 = move up, 0x01 = move down
+                const int dir = hasTopBeenHeld ? 0x00 : 0x01;
 
-                // 10 units per second
-                .rate = 0x10,
-            };
-            cmd.zcl_basic_cmd.src_endpoint = SWITCH_ENDPOINT_ID;
-            uint8_t seq_num = esp_zb_zcl_level_move_cmd_req(&cmd);
-            isBrightening = true;
+                // Begin continuous movement; ZCL spec 3-64.
+                // Only run this once, it'll start moving until stopped.
+                ESP_LOGI(TAG, "Top button held; sending level move command");
+                esp_zb_zcl_level_move_cmd_t cmd = {
+                    .address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT,
+                    .zcl_basic_cmd = {},
+                    .move_mode = dir,
+
+                    // 10 units per second
+                    .rate = 0x10,
+                };
+                cmd.zcl_basic_cmd.src_endpoint = SWITCH_ENDPOINT_ID;
+                uint8_t seq_num = esp_zb_zcl_level_move_cmd_req(&cmd);
+                isBrightening = true;
+            }
         }
 
         vTaskDelay(50 / portTICK_PERIOD_MS);
